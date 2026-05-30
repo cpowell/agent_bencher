@@ -7,4 +7,8 @@ def get_adapter(frontend: str):
         "claude": ClaudeAdapter,
         "opencode": OpenCodeAdapter,
     }
+
+    if frontend not in registry:
+        raise ValueError(f"unsupported frontend: {frontend}")
+
     return registry[frontend]()

@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from agent_bencher.cli import build_parser
 from agent_bencher.models import SessionResult, TokenUsage, TurnResult
 from agent_bencher.report import build_markdown_report
 
@@ -41,3 +44,12 @@ def test_build_markdown_report_includes_session_summary() -> None:
     assert "open-fast" in report
     assert "completed 2/2 prompts" in report
     assert "mtplx/mtplx-qwen36-27b-optimized-speed" in report
+
+
+def test_build_parser_accepts_suite_and_output_args() -> None:
+    parser = build_parser()
+    parsed = parser.parse_args(["bench", "suite.yaml", "--output-dir", "runs"])
+
+    assert parsed.command == "bench"
+    assert parsed.suite_path == Path("suite.yaml")
+    assert parsed.output_dir == Path("runs")
