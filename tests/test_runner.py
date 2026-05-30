@@ -1,0 +1,73 @@
+from dataclasses import dataclass
+from pathlib import Path
+
+from agent_bencher.models import Prompt, Suite, Variant
+from agent_bencher.runner import run_conversation
+
+
+@dataclass
+class FakeCompletedRun:
+    stdout: str
+    stderr: str
+    exit_code: int
+    duration_seconds: float
+
+
+class FakeAdapter:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str | None]] = []
+
+    def build_start_command(self, *, prompt, variant, workspace):
+        self.calls.append(("start", None))
+        return object()
+
+    def build_continue_command(self, *, prompt, variant, workspace, session_id):
+        self.calls.append(("continue", session_id))
+        return object()
+
+    def parse_turn_output(self, *, stdout: str, stderr: str):
+        return {
+            "session_id": "session-123",
+            "token_usage": {"input": 10, "output": 5},
+            "warnings": [],
+        }
+
+
+def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> None:
+    suite = Suite(
+        name="sample",
+        source_workspace=tmp_path,
+        prompts=[
+            Prompt(id="one", text="Do this"),
+            Prompt(id="two", text="Explain that"),
+        ],
+        variants=[
+            Variant(
+                id="open-fast",
+                frontend="opencode",
+                model="mtplx/mtplx-qwen36-27b-optimized-speed",
+            )
+        ],
+    )
+    adapter = FakeAdapter()
+
+    def fake_runner(_command):
+        return FakeCompletedRun(
+            stdout='{"session_id":"session-123"}',
+            stderr="",
+            exit_code=0,
+            duration_seconds=1.5,
+        )
+
+    result = run_conversation(
+        suite=suite,
+        variant=suite.variants[0],
+        workspace=tmp_path,
+        adapter=adapter,
+        run_command=fake_runner,
+    )
+
+    assert adapter.calls == [("start", None), ("continue", "session-123")]
+    assert result.prompts_attempted == 2
+    assert result.prompts_completed == 2
+    assert result.turns[1].session_id == "session-123"

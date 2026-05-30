@@ -25,3 +25,37 @@ class Suite:
     source_workspace: Path
     prompts: list[Prompt]
     variants: list[Variant]
+
+
+@dataclass(slots=True)
+class TokenUsage:
+    input: int = 0
+    output: int = 0
+    reasoning: int = 0
+    cache_read: int = 0
+    cache_write: int = 0
+
+
+@dataclass(slots=True)
+class TurnResult:
+    prompt_id: str
+    prompt_text: str
+    session_id: str
+    exit_code: int
+    duration_seconds: float
+    stdout: str
+    stderr: str
+    token_usage: TokenUsage
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class SessionResult:
+    suite_name: str
+    variant_id: str
+    frontend: str
+    backend_model: str
+    session_id: str
+    prompts_attempted: int
+    prompts_completed: int
+    turns: list[TurnResult]

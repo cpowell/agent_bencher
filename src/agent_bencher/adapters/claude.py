@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from agent_bencher.adapters.base import CommandSpec
@@ -27,3 +28,19 @@ class ClaudeAdapter:
             cwd=workspace,
             env=variant.env,
         )
+
+    def parse_turn_output(self, *, stdout: str, stderr: str):
+        payload = json.loads(stdout) if stdout.strip() else {}
+        result = payload.get("result", payload)
+        usage = result.get("usage", {})
+        return {
+            "session_id": result.get("session_id", payload.get("session_id", "")),
+            "token_usage": {
+                "input": usage.get("input_tokens", 0),
+                "output": usage.get("output_tokens", 0),
+                "reasoning": usage.get("reasoning_tokens", 0),
+                "cache_read": usage.get("cache_read_input_tokens", 0),
+                "cache_write": usage.get("cache_creation_input_tokens", 0),
+            },
+            "warnings": [],
+        }

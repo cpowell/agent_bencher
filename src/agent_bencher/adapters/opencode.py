@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from agent_bencher.adapters.base import CommandSpec
@@ -36,3 +37,12 @@ class OpenCodeAdapter:
             cwd=workspace,
             env=variant.env,
         )
+
+    def parse_turn_output(self, *, stdout: str, stderr: str):
+        lines = [line for line in stdout.splitlines() if line.strip()]
+        payload = json.loads(lines[-1]) if lines else {}
+        return {
+            "session_id": payload.get("session_id", ""),
+            "token_usage": payload.get("token_usage", {"input": 0, "output": 0}),
+            "warnings": [],
+        }
