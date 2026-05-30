@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from agent_bencher.models import Prompt, Suite, Variant
+from agent_bencher.models import AgentConfig, Conversation, Prompt
 from agent_bencher.runner import run_conversation
 
 
@@ -34,20 +34,18 @@ class FakeAdapter:
 
 
 def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> None:
-    suite = Suite(
+    conversation = Conversation(
         name="sample",
         source_workspace=tmp_path,
         prompts=[
             Prompt(id="one", text="Do this"),
             Prompt(id="two", text="Explain that"),
         ],
-        variants=[
-            Variant(
-                id="open-fast",
-                frontend="opencode",
-                model="mtplx/mtplx-qwen36-27b-optimized-speed",
-            )
-        ],
+    )
+    agent = AgentConfig(
+        id="open-fast",
+        frontend="opencode",
+        model="mtplx/mtplx-qwen36-27b-optimized-speed",
     )
     adapter = FakeAdapter()
 
@@ -60,8 +58,8 @@ def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> No
         )
 
     result = run_conversation(
-        suite=suite,
-        variant=suite.variants[0],
+        conversation=conversation,
+        agent=agent,
         workspace=tmp_path,
         adapter=adapter,
         run_command=fake_runner,

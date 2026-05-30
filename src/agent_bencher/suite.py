@@ -4,27 +4,27 @@ from pathlib import Path
 
 import yaml
 
-from agent_bencher.models import Prompt, Suite, Variant
+from agent_bencher.models import AgentConfig, Conversation, Prompt
 
 
-def load_suite(path: Path) -> Suite:
+def load_conversation(path: Path) -> Conversation:
     data = yaml.safe_load(path.read_text())
-
     prompts = [Prompt(id=item["id"], text=item["text"]) for item in data["prompts"]]
-    variants = [
-        Variant(
-            id=item["id"],
-            frontend=item["frontend"],
-            model=item["model"],
-            args=list(item.get("args", [])),
-            env={key: str(value) for key, value in item.get("env", {}).items()},
-        )
-        for item in data["variants"]
-    ]
 
-    return Suite(
+    return Conversation(
         name=data["name"],
         source_workspace=Path(data["source_workspace"]),
         prompts=prompts,
-        variants=variants,
+    )
+
+
+def load_agent_config(path: Path) -> AgentConfig:
+    data = yaml.safe_load(path.read_text())
+
+    return AgentConfig(
+        id=data["id"],
+        frontend=data["frontend"],
+        model=data["model"],
+        args=list(data.get("args", [])),
+        env={key: str(value) for key, value in data.get("env", {}).items()},
     )

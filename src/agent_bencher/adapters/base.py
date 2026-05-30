@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from agent_bencher.models import Prompt, Variant
+from agent_bencher.models import AgentConfig, Prompt
 
 
 @dataclass(slots=True)
@@ -15,13 +15,13 @@ class CommandSpec:
 
 
 class FrontendAdapter(Protocol):
-    def build_start_command(self, *, prompt: Prompt, variant: Variant, workspace: Path) -> CommandSpec: ...
+    def build_start_command(self, *, prompt: Prompt, variant: AgentConfig, workspace: Path) -> CommandSpec: ...
 
     def build_continue_command(
         self,
         *,
         prompt: Prompt,
-        variant: Variant,
+        variant: AgentConfig,
         workspace: Path,
         session_id: str,
     ) -> CommandSpec: ...

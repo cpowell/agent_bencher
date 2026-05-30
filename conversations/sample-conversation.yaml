@@ -1,0 +1,7 @@
+name: sample-conversation
+source_workspace: /Users/chris/Code/python/agent_bencher
+prompts:
+  - id: inspect
+    text: "Inspect this repository and tell me, in 3 concise bullets, what the benchmark harness currently does."
+  - id: summarize
+    text: "Now summarize the current architecture in 2 short paragraphs, focusing on how a benchmark suite gets executed."

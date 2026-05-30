@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 
 from agent_bencher.adapters.base import CommandSpec
-from agent_bencher.models import Prompt, Variant
+from agent_bencher.models import AgentConfig, Prompt
 
 
 class OpenCodeAdapter:
-    def build_start_command(self, *, prompt: Prompt, variant: Variant, workspace: Path) -> CommandSpec:
+    def build_start_command(self, *, prompt: Prompt, variant: AgentConfig, workspace: Path) -> CommandSpec:
         return CommandSpec(
             argv=["opencode", "run", *variant.args, "-m", variant.model, prompt.text],
             cwd=workspace,
@@ -19,7 +19,7 @@ class OpenCodeAdapter:
         self,
         *,
         prompt: Prompt,
-        variant: Variant,
+        variant: AgentConfig,
         workspace: Path,
         session_id: str,
     ) -> CommandSpec:

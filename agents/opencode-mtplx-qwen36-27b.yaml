@@ -1,0 +1,7 @@
+id: opencode-mtplx-qwen36-27b
+frontend: opencode
+model: mtplx/mtplx-qwen36-27b-optimized-speed
+args:
+  - --format
+  - json
+env: {}

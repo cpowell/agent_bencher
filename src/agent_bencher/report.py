@@ -13,9 +13,10 @@ def build_markdown_report(sessions: list[SessionResult]) -> str:
 
         lines.extend(
             [
-                f"## {session.variant_id}",
+                f"## {session.agent_id}",
                 f"- frontend: {session.frontend}",
                 f"- backend model: {session.backend_model}",
+                f"- conversation: {session.conversation_name}",
                 f"- session id: {session.session_id}",
                 f"- completed {session.prompts_completed}/{session.prompts_attempted} prompts",
                 f"- total duration: {total_duration:.2f}s",

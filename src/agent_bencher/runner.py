@@ -2,20 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_bencher.models import SessionResult, Suite, TokenUsage, TurnResult, Variant
+from agent_bencher.models import AgentConfig, Conversation, SessionResult, TokenUsage, TurnResult
 
 
-def run_conversation(*, suite: Suite, variant: Variant, workspace: Path, adapter, run_command):
+def run_conversation(*, conversation: Conversation, agent: AgentConfig, workspace: Path, adapter, run_command):
     turns: list[TurnResult] = []
     session_id = ""
 
-    for index, prompt in enumerate(suite.prompts):
+    for index, prompt in enumerate(conversation.prompts):
         if index == 0:
-            command = adapter.build_start_command(prompt=prompt, variant=variant, workspace=workspace)
+            command = adapter.build_start_command(prompt=prompt, variant=agent, workspace=workspace)
         else:
             command = adapter.build_continue_command(
                 prompt=prompt,
-                variant=variant,
+                variant=agent,
                 workspace=workspace,
                 session_id=session_id,
             )
@@ -42,10 +42,10 @@ def run_conversation(*, suite: Suite, variant: Variant, workspace: Path, adapter
             break
 
     return SessionResult(
-        suite_name=suite.name,
-        variant_id=variant.id,
-        frontend=variant.frontend,
-        backend_model=variant.model,
+        conversation_name=conversation.name,
+        agent_id=agent.id,
+        frontend=agent.frontend,
+        backend_model=agent.model,
         session_id=session_id,
         prompts_attempted=len(turns),
         prompts_completed=sum(1 for turn in turns if turn.exit_code == 0),

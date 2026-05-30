@@ -11,7 +11,7 @@ class Prompt:
 
 
 @dataclass(slots=True)
-class Variant:
+class AgentConfig:
     id: str
     frontend: str
     model: str
@@ -20,11 +20,10 @@ class Variant:
 
 
 @dataclass(slots=True)
-class Suite:
+class Conversation:
     name: str
     source_workspace: Path
     prompts: list[Prompt]
-    variants: list[Variant]
 
 
 @dataclass(slots=True)
@@ -51,8 +50,8 @@ class TurnResult:
 
 @dataclass(slots=True)
 class SessionResult:
-    suite_name: str
-    variant_id: str
+    conversation_name: str
+    agent_id: str
     frontend: str
     backend_model: str
     session_id: str

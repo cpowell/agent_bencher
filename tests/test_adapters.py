@@ -2,12 +2,12 @@ from pathlib import Path
 
 from agent_bencher.adapters.claude import ClaudeAdapter
 from agent_bencher.adapters.opencode import OpenCodeAdapter
-from agent_bencher.models import Prompt, Variant
+from agent_bencher.models import AgentConfig, Prompt
 
 
 def test_opencode_start_command_uses_real_cli_shape(tmp_path: Path) -> None:
     adapter = OpenCodeAdapter()
-    variant = Variant(
+    agent = AgentConfig(
         id="open-fast",
         frontend="opencode",
         model="mtplx/mtplx-qwen36-27b-optimized-speed",
@@ -17,7 +17,7 @@ def test_opencode_start_command_uses_real_cli_shape(tmp_path: Path) -> None:
 
     command = adapter.build_start_command(
         prompt=Prompt(id="intro", text="Reply with exactly OK"),
-        variant=variant,
+        variant=agent,
         workspace=tmp_path,
     )
 
