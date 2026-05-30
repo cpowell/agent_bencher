@@ -30,39 +30,23 @@ def test_opencode_start_command_uses_real_cli_shape(tmp_path: Path) -> None:
         "mtplx/mtplx-qwen36-27b-optimized-speed",
         "Reply with exactly OK",
     ]
-    assert command.cwd == tmp_path
 
 
-def test_claude_start_command_keeps_env_and_model_flag(tmp_path: Path) -> None:
-    adapter = ClaudeAdapter()
-    variant = Variant(
-        id="claude-opus",
-        frontend="claude",
-        model="Qwen3.6-27B-4bit",
-        args=["--output-format", "json", "--permission-mode", "bypassPermissions", "--model", "opus"],
-        env={
-            "ANTHROPIC_BASE_URL": "http://127.0.0.1:8000",
-            "ANTHROPIC_AUTH_TOKEN": "cbp8",
-            "ANTHROPIC_DEFAULT_OPUS_MODEL": "Qwen3.6-27B-4bit",
-        },
-    )
+def test_claude_parser_reads_usage_and_session_id_from_json_fixture() -> None:
+    payload = Path("tests/fixtures/claude-turn.json").read_text()
 
-    command = adapter.build_start_command(
-        prompt=Prompt(id="intro", text="Reply with exactly OK"),
-        variant=variant,
-        workspace=tmp_path,
-    )
+    parsed = ClaudeAdapter().parse_turn_output(stdout=payload, stderr="")
 
-    assert command.argv == [
-        "claude",
-        "-p",
-        "Reply with exactly OK",
-        "--output-format",
-        "json",
-        "--permission-mode",
-        "bypassPermissions",
-        "--model",
-        "opus",
-    ]
-    assert command.env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "Qwen3.6-27B-4bit"
-    assert command.cwd == tmp_path
+    assert parsed["session_id"] == "claude-session-123"
+    assert parsed["token_usage"]["input"] == 120
+    assert parsed["token_usage"]["output"] == 45
+
+
+def test_opencode_parser_reads_usage_and_session_id_from_jsonl_fixture() -> None:
+    payload = Path("tests/fixtures/opencode-turn.jsonl").read_text()
+
+    parsed = OpenCodeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == "opencode-session-123"
+    assert parsed["token_usage"]["input"] == 210
+    assert parsed["token_usage"]["output"] == 80

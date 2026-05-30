@@ -1,0 +1,2 @@
+{"type":"session.started","session_id":"opencode-session-123"}
+{"type":"response.completed","session_id":"opencode-session-123","token_usage":{"input":210,"output":80,"reasoning":0,"cache_read":0,"cache_write":0}}

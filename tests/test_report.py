@@ -1,0 +1,43 @@
+from agent_bencher.models import SessionResult, TokenUsage, TurnResult
+from agent_bencher.report import build_markdown_report
+
+
+def test_build_markdown_report_includes_session_summary() -> None:
+    session = SessionResult(
+        suite_name="sample-suite",
+        variant_id="open-fast",
+        frontend="opencode",
+        backend_model="mtplx/mtplx-qwen36-27b-optimized-speed",
+        session_id="opencode-session-123",
+        prompts_attempted=2,
+        prompts_completed=2,
+        turns=[
+            TurnResult(
+                prompt_id="intro",
+                prompt_text="Do this",
+                session_id="opencode-session-123",
+                exit_code=0,
+                duration_seconds=1.2,
+                stdout="{}",
+                stderr="",
+                token_usage=TokenUsage(input=100, output=40),
+            ),
+            TurnResult(
+                prompt_id="explain",
+                prompt_text="Explain that",
+                session_id="opencode-session-123",
+                exit_code=0,
+                duration_seconds=2.3,
+                stdout="{}",
+                stderr="",
+                token_usage=TokenUsage(input=210, output=80),
+            ),
+        ],
+    )
+
+    report = build_markdown_report([session])
+
+    assert "# Benchmark Summary" in report
+    assert "open-fast" in report
+    assert "completed 2/2 prompts" in report
+    assert "mtplx/mtplx-qwen36-27b-optimized-speed" in report

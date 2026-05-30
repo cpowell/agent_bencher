@@ -39,10 +39,19 @@ class OpenCodeAdapter:
         )
 
     def parse_turn_output(self, *, stdout: str, stderr: str):
-        lines = [line for line in stdout.splitlines() if line.strip()]
-        payload = json.loads(lines[-1]) if lines else {}
+        session_id = ""
+        token_usage = {"input": 0, "output": 0, "reasoning": 0, "cache_read": 0, "cache_write": 0}
+
+        for line in stdout.splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            session_id = payload.get("session_id", session_id)
+            if payload.get("type") == "response.completed":
+                token_usage = payload.get("token_usage", token_usage)
+
         return {
-            "session_id": payload.get("session_id", ""),
-            "token_usage": payload.get("token_usage", {"input": 0, "output": 0}),
+            "session_id": session_id,
+            "token_usage": token_usage,
             "warnings": [],
         }
