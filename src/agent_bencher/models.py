@@ -52,11 +52,16 @@ class TurnResult:
 
 @dataclass(slots=True)
 class SessionResult:
+    run_id: str
     conversation_name: str
     agent_id: str
     frontend: str
     backend_model: str
     session_id: str
+    started_at: str
+    ended_at: str
+    duration_seconds: float
+    status: str
     prompts_attempted: int
     prompts_completed: int
     turns: list[TurnResult]

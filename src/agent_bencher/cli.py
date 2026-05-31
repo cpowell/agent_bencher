@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_bencher.adapters import get_adapter
@@ -9,6 +10,10 @@ from agent_bencher.results import write_results
 from agent_bencher.runner import run_conversation
 from agent_bencher.suite import load_agent_config, load_conversation
 from agent_bencher.workspace import prepare_variant_workspace
+
+
+def format_run_id(date_part: str, time_part: str) -> str:
+    return f"{date_part}T{time_part.replace(':', '-')}"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +37,10 @@ def main(argv: list[str] | None = None) -> int:
 
     conversation = load_conversation(args.conversation)
     agent = load_agent_config(args.agent)
+    now = datetime.now(timezone.utc)
+    run_id = format_run_id(now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"))
+    started_at = now.isoformat()
+    run_output_dir = args.output_dir / conversation.name / agent.id / run_id
 
     prepared = prepare_variant_workspace(
         source_workspace=conversation.source_workspace,
@@ -46,7 +55,9 @@ def main(argv: list[str] | None = None) -> int:
         workspace=prepared.variant_workspace,
         adapter=adapter,
         run_command=run_command,
+        run_id=run_id,
+        started_at=started_at,
     )
 
-    write_results(sessions=[session], output_dir=args.output_dir / conversation.name / agent.id)
+    write_results(sessions=[session], output_dir=run_output_dir)
     return 0

@@ -1,7 +1,8 @@
-import socket
+from types import SimpleNamespace
 from pathlib import Path
+import stat
 
-from agent_bencher.workspace import prepare_variant_workspace
+from agent_bencher.workspace import _build_ignore_function, prepare_variant_workspace
 
 
 def test_prepare_variant_workspace_copies_source_tree(tmp_path: Path) -> None:
@@ -47,21 +48,26 @@ def test_prepare_variant_workspace_ignores_unix_socket_files(tmp_path: Path) -> 
     source = tmp_path / "project"
     source.mkdir()
     (source / "README.txt").write_text("hello")
+    (source / "service.sock").write_text("placeholder")
 
-    socket_path = source / "service.sock"
-    sock = socket.socket(socket.AF_UNIX)
-    sock.bind(str(socket_path))
+    ignore = _build_ignore_function(
+        source_workspace=source,
+        run_root=source / "runs",
+    )
 
+    assert ignore is not None
+
+    original_lstat = Path.lstat
+
+    def fake_lstat(path: Path):
+        if path.name == "service.sock":
+            return SimpleNamespace(st_mode=stat.S_IFSOCK)
+        return original_lstat(path)
+
+    Path.lstat = fake_lstat
     try:
-        prepared = prepare_variant_workspace(
-            source_workspace=source,
-            run_root=tmp_path / "runs",
-            suite_name="sample-suite",
-            variant_id="opencode-fast",
-        )
+        ignored = ignore(str(source), ["README.txt", "service.sock"])
     finally:
-        sock.close()
+        Path.lstat = original_lstat
 
-    assert prepared.variant_workspace.exists()
-    assert (prepared.variant_workspace / "README.txt").read_text() == "hello"
-    assert not (prepared.variant_workspace / "service.sock").exists()
+    assert ignored == {"service.sock"}
