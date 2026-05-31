@@ -42,6 +42,55 @@ def test_claude_parser_reads_usage_and_session_id_from_json_fixture() -> None:
     assert parsed["token_usage"]["output"] == 45
 
 
+def test_claude_parser_reads_usage_and_session_id_from_json_list_fixture() -> None:
+    payload = """
+[
+  {
+    "type": "system",
+    "session_id": "claude-session-456"
+  },
+  {
+    "result": {
+      "session_id": "claude-session-456",
+      "usage": {
+        "input_tokens": 210,
+        "output_tokens": 80,
+        "reasoning_tokens": 5,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      }
+    }
+  }
+]
+"""
+
+    parsed = ClaudeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == "claude-session-456"
+    assert parsed["token_usage"]["input"] == 210
+    assert parsed["token_usage"]["output"] == 80
+
+
+def test_claude_parser_tolerates_string_result_entries() -> None:
+    payload = """
+[
+  {
+    "type": "system",
+    "session_id": "claude-session-789"
+  },
+  {
+    "result": "intermediate text event"
+  }
+]
+"""
+
+    parsed = ClaudeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == "claude-session-789"
+    assert parsed["token_usage"]["input"] == 0
+    assert parsed["token_usage"]["output"] == 0
+
+
 def test_opencode_parser_reads_usage_and_session_id_from_jsonl_fixture() -> None:
     payload = Path("tests/fixtures/opencode-turn.jsonl").read_text()
 

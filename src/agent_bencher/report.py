@@ -22,8 +22,19 @@ def build_markdown_report(sessions: list[SessionResult]) -> str:
                 f"- total duration: {total_duration:.2f}s",
                 f"- total input tokens: {total_input}",
                 f"- total output tokens: {total_output}",
+                f"- combined conversation: conversation.md",
                 "",
+                "| Turn | Prompt | Duration (s) | Input | Output | Stdout | Stderr |",
+                "| --- | --- | ---: | ---: | ---: | --- | --- |",
             ]
         )
+
+        for turn_index, turn in enumerate(session.turns, start=1):
+            lines.append(
+                f"| {turn_index} | {turn.prompt_id} | {turn.duration_seconds:.2f} | "
+                f"{turn.token_usage.input} | {turn.token_usage.output} | "
+                f"`{turn.stdout_path or 'transcripts/pending'}` | `{turn.stderr_path or 'transcripts/pending'}` |"
+            )
+        lines.append("")
 
     return "\n".join(lines)
