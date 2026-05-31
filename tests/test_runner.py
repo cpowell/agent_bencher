@@ -11,6 +11,8 @@ class FakeCompletedRun:
     stderr: str
     exit_code: int
     duration_seconds: float
+    started_at: str
+    ended_at: str
 
 
 class FakeAdapter:
@@ -55,6 +57,8 @@ def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> No
             stderr="",
             exit_code=0,
             duration_seconds=1.5,
+            started_at="2026-05-31T14:26:00Z",
+            ended_at="2026-05-31T14:26:01.500000Z",
         )
 
     result = run_conversation(
@@ -70,6 +74,8 @@ def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> No
     assert adapter.calls == [("start", None), ("continue", "session-123")]
     assert result.prompts_attempted == 2
     assert result.prompts_completed == 2
+    assert result.turns[0].started_at == "2026-05-31T14:26:00Z"
+    assert result.turns[0].ended_at == "2026-05-31T14:26:01.500000Z"
     assert result.turns[1].session_id == "session-123"
 
 
@@ -92,6 +98,8 @@ def test_run_conversation_records_status_and_execution_timestamps(tmp_path: Path
             stderr="",
             exit_code=0,
             duration_seconds=1.5,
+            started_at="2026-05-31T14:26:00Z",
+            ended_at="2026-05-31T14:26:01.500000Z",
         )
 
     result = run_conversation(
@@ -108,6 +116,8 @@ def test_run_conversation_records_status_and_execution_timestamps(tmp_path: Path
     assert result.started_at
     assert result.ended_at
     assert result.duration_seconds == 1.5
+    assert result.turns[0].started_at == "2026-05-31T14:26:00Z"
+    assert result.turns[0].ended_at == "2026-05-31T14:26:01.500000Z"
 
 
 def test_run_conversation_uses_agent_execution_time_not_bookkeeping(tmp_path: Path) -> None:
@@ -125,8 +135,22 @@ def test_run_conversation_uses_agent_execution_time_not_bookkeeping(tmp_path: Pa
 
     calls = iter(
         [
-            FakeCompletedRun(stdout='{"session_id":"session-123"}', stderr="", exit_code=0, duration_seconds=1.5),
-            FakeCompletedRun(stdout='{"session_id":"session-123"}', stderr="", exit_code=0, duration_seconds=2.0),
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=1.5,
+                started_at="2026-05-31T14:26:00Z",
+                ended_at="2026-05-31T14:26:01.500000Z",
+            ),
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=2.0,
+                started_at="2026-05-31T14:26:01.500000Z",
+                ended_at="2026-05-31T14:26:03.500000Z",
+            ),
         ]
     )
 

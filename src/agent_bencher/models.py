@@ -45,6 +45,8 @@ class TurnResult:
     stdout: str
     stderr: str
     token_usage: TokenUsage
+    started_at: str = ""
+    ended_at: str = ""
     stdout_path: str = ""
     stderr_path: str = ""
     warnings: list[str] = field(default_factory=list)

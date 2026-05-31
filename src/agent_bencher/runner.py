@@ -44,6 +44,8 @@ def run_conversation(
                 stdout=completed.stdout,
                 stderr=completed.stderr,
                 token_usage=TokenUsage(**parsed["token_usage"]),
+                started_at=completed.started_at,
+                ended_at=completed.ended_at,
                 warnings=list(parsed["warnings"]),
             )
         )
@@ -63,7 +65,7 @@ def run_conversation(
         backend_model=agent.model,
         session_id=session_id,
         started_at=started_at,
-        ended_at=started_at,
+        ended_at=turns[-1].ended_at if turns else started_at,
         duration_seconds=execution_duration,
         status=status,
         prompts_attempted=len(turns),
