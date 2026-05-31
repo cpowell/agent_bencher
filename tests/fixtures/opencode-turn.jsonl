@@ -1,2 +1,3 @@
-{"type":"session.started","session_id":"opencode-session-123"}
-{"type":"response.completed","session_id":"opencode-session-123","token_usage":{"input":210,"output":80,"reasoning":0,"cache_read":0,"cache_write":0}}
+{"type":"step_start","sessionID":"opencode-session-123","part":{"type":"step-start"}}
+{"type":"tool_use","sessionID":"opencode-session-123","part":{"type":"tool","tool":"glob"}}
+{"type":"step_finish","sessionID":"opencode-session-123","part":{"type":"step-finish","tokens":{"total":290,"input":210,"output":80,"reasoning":0,"cache":{"write":0,"read":0}}}}

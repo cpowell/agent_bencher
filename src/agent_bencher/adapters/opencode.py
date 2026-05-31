@@ -46,8 +46,19 @@ class OpenCodeAdapter:
             if not line.strip():
                 continue
             payload = json.loads(line)
-            session_id = payload.get("session_id", session_id)
-            if payload.get("type") == "response.completed":
+            session_id = payload.get("sessionID", payload.get("session_id", session_id))
+            if payload.get("type") == "step_finish":
+                part = payload.get("part", {})
+                tokens = part.get("tokens", {})
+                cache = tokens.get("cache", {})
+                token_usage = {
+                    "input": tokens.get("input", 0),
+                    "output": tokens.get("output", 0),
+                    "reasoning": tokens.get("reasoning", 0),
+                    "cache_read": cache.get("read", 0),
+                    "cache_write": cache.get("write", 0),
+                }
+            elif payload.get("type") == "response.completed":
                 token_usage = payload.get("token_usage", token_usage)
 
         return {
