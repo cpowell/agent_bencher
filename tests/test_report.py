@@ -17,6 +17,7 @@ def test_build_markdown_report_includes_session_summary() -> None:
         ended_at="2026-05-31T14:26:03Z",
         duration_seconds=3.5,
         status="completed",
+        comment="nightly comparison against local models",
         prompts_attempted=2,
         prompts_completed=2,
         turns=[
@@ -49,6 +50,14 @@ def test_build_markdown_report_includes_session_summary() -> None:
     assert "open-fast" in report
     assert "completed 2/2 prompts" in report
     assert "mtplx/mtplx-qwen36-27b-optimized-speed" in report
+    assert "effective output TPS" in report
+    assert "34.29" in report
+    assert "effective total throughput TPS" in report
+    assert "122.86" in report
+    assert "comment: nightly comparison against local models" in report
+    assert "| Turn | Prompt | Duration (s) | Input | Output | Output TPS | Total Throughput TPS | Stdout | Stderr |" in report
+    assert "| 1 | intro | 1.20 | 100 | 40 | 33.33 | 116.67 |" in report
+    assert "| 2 | explain | 2.30 | 210 | 80 | 34.78 | 126.09 |" in report
 
 
 def test_build_parser_accepts_conversation_and_agent_args() -> None:
@@ -87,6 +96,7 @@ def test_build_markdown_report_points_to_run_artifacts() -> None:
         ended_at="2026-05-31T14:26:03Z",
         duration_seconds=3.5,
         status="completed",
+        comment="",
         prompts_attempted=2,
         prompts_completed=2,
         turns=[],
@@ -97,3 +107,20 @@ def test_build_markdown_report_points_to_run_artifacts() -> None:
     assert "conversation.md" in report
     assert "run.json" in report
     assert "turns.jsonl" in report
+
+
+def test_build_parser_accepts_comment_arg() -> None:
+    parser = build_parser()
+    parsed = parser.parse_args(
+        [
+            "bench",
+            "--conversation",
+            "conversations/sample.yaml",
+            "--agent",
+            "agents/opencode.yaml",
+            "--comment",
+            "nightly regression sweep",
+        ]
+    )
+
+    assert parsed.comment == "nightly regression sweep"

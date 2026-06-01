@@ -13,6 +13,7 @@ def run_conversation(
     run_command,
     run_id: str,
     started_at: str,
+    comment: str = "",
 ):
     turns: list[TurnResult] = []
     session_id = ""
@@ -63,6 +64,7 @@ def run_conversation(
         agent_id=agent.id,
         frontend=agent.frontend,
         backend_model=agent.model,
+        comment=comment,
         session_id=session_id,
         started_at=started_at,
         ended_at=turns[-1].ended_at if turns else started_at,

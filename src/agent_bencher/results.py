@@ -22,6 +22,20 @@ def _write_turn_transcripts(*, output_dir: Path, turn: TurnResult, turn_index: i
     turn.stderr_path = str(stderr_path)
 
 
+def _safe_divide(numerator: float, denominator: float) -> float:
+    if denominator == 0:
+        return 0.0
+    return numerator / denominator
+
+
+def _output_tps(*, output_tokens: int, duration_seconds: float) -> float:
+    return _safe_divide(output_tokens, duration_seconds)
+
+
+def _total_throughput_tps(*, input_tokens: int, output_tokens: int, duration_seconds: float) -> float:
+    return _safe_divide(input_tokens + output_tokens, duration_seconds)
+
+
 def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
     return {
         "run_id": run_id,
@@ -35,6 +49,15 @@ def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
         "ended_at": turn.ended_at,
         "input_tokens": turn.token_usage.input,
         "output_tokens": turn.token_usage.output,
+        "output_tps": _output_tps(
+            output_tokens=turn.token_usage.output,
+            duration_seconds=turn.duration_seconds,
+        ),
+        "total_throughput_tps": _total_throughput_tps(
+            input_tokens=turn.token_usage.input,
+            output_tokens=turn.token_usage.output,
+            duration_seconds=turn.duration_seconds,
+        ),
         "reasoning_tokens": turn.token_usage.reasoning,
         "cache_read_tokens": turn.token_usage.cache_read,
         "cache_write_tokens": turn.token_usage.cache_write,
@@ -45,12 +68,19 @@ def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
 
 
 def _serialize_run(session: SessionResult, *, conversation_path: str, transcript_dir: str) -> dict:
+    total_input_tokens = sum(turn.token_usage.input for turn in session.turns)
+    total_output_tokens = sum(turn.token_usage.output for turn in session.turns)
+    total_reasoning_tokens = sum(turn.token_usage.reasoning for turn in session.turns)
+    total_cache_read_tokens = sum(turn.token_usage.cache_read for turn in session.turns)
+    total_cache_write_tokens = sum(turn.token_usage.cache_write for turn in session.turns)
+
     return {
         "run_id": session.run_id,
         "conversation_name": session.conversation_name,
         "agent_id": session.agent_id,
         "frontend": session.frontend,
         "backend_model": session.backend_model,
+        "comment": session.comment,
         "started_at": session.started_at,
         "ended_at": session.ended_at,
         "duration_seconds": session.duration_seconds,
@@ -58,11 +88,20 @@ def _serialize_run(session: SessionResult, *, conversation_path: str, transcript
         "prompts_completed": session.prompts_completed,
         "session_id": session.session_id,
         "status": session.status,
-        "total_input_tokens": sum(turn.token_usage.input for turn in session.turns),
-        "total_output_tokens": sum(turn.token_usage.output for turn in session.turns),
-        "total_reasoning_tokens": sum(turn.token_usage.reasoning for turn in session.turns),
-        "total_cache_read_tokens": sum(turn.token_usage.cache_read for turn in session.turns),
-        "total_cache_write_tokens": sum(turn.token_usage.cache_write for turn in session.turns),
+        "total_input_tokens": total_input_tokens,
+        "total_output_tokens": total_output_tokens,
+        "effective_output_tps": _output_tps(
+            output_tokens=total_output_tokens,
+            duration_seconds=session.duration_seconds,
+        ),
+        "effective_total_throughput_tps": _total_throughput_tps(
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            duration_seconds=session.duration_seconds,
+        ),
+        "total_reasoning_tokens": total_reasoning_tokens,
+        "total_cache_read_tokens": total_cache_read_tokens,
+        "total_cache_write_tokens": total_cache_write_tokens,
         "conversation_path": conversation_path,
         "transcript_dir": transcript_dir,
     }
@@ -233,6 +272,14 @@ def _write_combined_conversation_artifact(*, output_dir: Path, session: SessionR
         f"- session id: {session.session_id}",
         "",
     ]
+
+    if session.comment:
+        lines.extend(
+            [
+                f"User comment: {session.comment}",
+                "",
+            ]
+        )
 
     for turn_index, turn in enumerate(session.turns, start=1):
         assistant_text = _extract_human_readable_stdout(turn.stdout)

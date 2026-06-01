@@ -67,3 +67,4 @@ class SessionResult:
     prompts_attempted: int
     prompts_completed: int
     turns: list[TurnResult]
+    comment: str = ""

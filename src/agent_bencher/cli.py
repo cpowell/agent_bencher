@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     bench = subparsers.add_parser("bench")
     bench.add_argument("--conversation", type=Path, required=True)
     bench.add_argument("--agent", type=Path, required=True)
+    bench.add_argument("--comment", default="")
     bench.add_argument("--output-dir", type=Path, default=Path("runs"))
 
     return parser
@@ -57,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         run_command=run_command,
         run_id=run_id,
         started_at=started_at,
+        comment=args.comment,
     )
 
     write_results(sessions=[session], output_dir=run_output_dir)
