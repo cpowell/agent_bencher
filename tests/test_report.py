@@ -60,15 +60,13 @@ def test_build_markdown_report_includes_session_summary() -> None:
     assert "| 2 | explain | 2.30 | 210 | 80 | 34.78 | 126.09 |" in report
 
 
-def test_build_parser_accepts_conversation_and_agent_args() -> None:
+def test_build_parser_accepts_positional_run_config_then_conversation_args() -> None:
     parser = build_parser()
     parsed = parser.parse_args(
         [
             "bench",
-            "--conversation",
+            "run_configs/opencode.yaml",
             "conversations/sample.yaml",
-            "--agent",
-            "agents/opencode.yaml",
             "--output-dir",
             "runs",
         ]
@@ -76,7 +74,7 @@ def test_build_parser_accepts_conversation_and_agent_args() -> None:
 
     assert parsed.command == "bench"
     assert parsed.conversation == Path("conversations/sample.yaml")
-    assert parsed.agent == Path("agents/opencode.yaml")
+    assert parsed.run_config == Path("run_configs/opencode.yaml")
     assert parsed.output_dir == Path("runs")
 
 
@@ -114,10 +112,8 @@ def test_build_parser_accepts_comment_arg() -> None:
     parsed = parser.parse_args(
         [
             "bench",
-            "--conversation",
+            "run_configs/opencode.yaml",
             "conversations/sample.yaml",
-            "--agent",
-            "agents/opencode.yaml",
             "--comment",
             "nightly regression sweep",
         ]

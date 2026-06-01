@@ -23,6 +23,9 @@ def run_conversation(
     turns: list[TurnResult] = []
     session_id = ""
     execution_duration = 0.0
+    warmup = run_command(adapter.build_warmup_command(variant=agent, workspace=workspace))
+    if warmup.exit_code != 0:
+        raise RuntimeError(f"warmup failed with exit code {warmup.exit_code}: {warmup.stderr or warmup.stdout}")
 
     for index, prompt in enumerate(conversation.prompts):
         if index == 0:

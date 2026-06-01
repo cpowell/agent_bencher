@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent_bencher.adapters.base import CommandSpec
+from agent_bencher.adapters.base import CommandSpec, WARMUP_PROMPT
 from agent_bencher.models import AgentConfig, Prompt
 
 
@@ -15,6 +15,13 @@ def _result_dict(candidate: dict) -> dict:
 
 
 class ClaudeAdapter:
+    def build_warmup_command(self, *, variant: AgentConfig, workspace: Path) -> CommandSpec:
+        return CommandSpec(
+            argv=["claude", "-p", WARMUP_PROMPT, *variant.args],
+            cwd=workspace,
+            env=variant.env,
+        )
+
     def build_start_command(self, *, prompt: Prompt, variant: AgentConfig, workspace: Path) -> CommandSpec:
         return CommandSpec(
             argv=["claude", "-p", prompt.text, *variant.args],

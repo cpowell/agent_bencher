@@ -1,0 +1,7 @@
+id: opencode-omlx-qwen36-27b-oQ4-mtp
+frontend: opencode
+model: omlx/Qwen3.6-27B-oQ4-mtp
+args:
+  - --format
+  - json
+env: {}

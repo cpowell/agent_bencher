@@ -1467,7 +1467,7 @@ from agent_bencher.workspace import prepare_variant_workspace
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agent-bencher")
+    parser = argparse.ArgumentParser(prog="python -m agent_bencher")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     bench = subparsers.add_parser("bench")

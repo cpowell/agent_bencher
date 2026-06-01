@@ -251,12 +251,10 @@ Representative shape:
 
 ```yaml
 name: basic-conversation-benchmark
-source_workspace: /abs/path/to/project
+source_workspace: ../project
 prompts:
-  - id: intro
-    text: "Do this"
-  - id: explain
-    text: "Explain that"
+  - text: "Do this"
+  - text: "Explain that"
 variants:
   - id: opencode-mtplx-27b
     frontend: opencode

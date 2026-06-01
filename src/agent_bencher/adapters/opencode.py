@@ -3,11 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent_bencher.adapters.base import CommandSpec
+from agent_bencher.adapters.base import CommandSpec, WARMUP_PROMPT
 from agent_bencher.models import AgentConfig, Prompt
 
 
 class OpenCodeAdapter:
+    def build_warmup_command(self, *, variant: AgentConfig, workspace: Path) -> CommandSpec:
+        return CommandSpec(
+            argv=["opencode", "run", *variant.args, "-m", variant.model, WARMUP_PROMPT],
+            cwd=workspace,
+            env=variant.env,
+        )
+
     def build_start_command(self, *, prompt: Prompt, variant: AgentConfig, workspace: Path) -> CommandSpec:
         return CommandSpec(
             argv=["opencode", "run", *variant.args, "-m", variant.model, prompt.text],
