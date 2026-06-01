@@ -40,6 +40,35 @@ class FakeAdapter:
         }
 
 
+class FakeProgressBar:
+    def __init__(self, *, total: int, disable: bool, unit: str) -> None:
+        self.total = total
+        self.disable = disable
+        self.unit = unit
+        self.descriptions: list[str] = []
+        self.updated: list[int] = []
+        self.closed = False
+
+    def set_description_str(self, value: str) -> None:
+        self.descriptions.append(value)
+
+    def update(self, value: int) -> None:
+        self.updated.append(value)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class FakeProgressFactory:
+    def __init__(self) -> None:
+        self.created: list[FakeProgressBar] = []
+
+    def __call__(self, *, total: int, disable: bool, unit: str) -> FakeProgressBar:
+        bar = FakeProgressBar(total=total, disable=disable, unit=unit)
+        self.created.append(bar)
+        return bar
+
+
 def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> None:
     conversation = Conversation(
         name="sample",
@@ -86,6 +115,114 @@ def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> No
     assert result.turns[0].prompt_id == "01"
     assert result.turns[1].session_id == "session-123"
     assert result.turns[1].prompt_id == "02"
+
+
+def test_run_conversation_reports_prompt_progress(tmp_path: Path) -> None:
+    conversation = Conversation(
+        name="sample",
+        source_workspace=tmp_path,
+        prompts=[
+            Prompt(text="Do this"),
+            Prompt(text="Explain that"),
+        ],
+    )
+    agent = AgentConfig(
+        id="open-fast",
+        frontend="opencode",
+        model="mtplx/mtplx-qwen36-27b-optimized-speed",
+    )
+    adapter = FakeAdapter()
+    progress_factory = FakeProgressFactory()
+
+    calls = iter(
+        [
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=1.5,
+                started_at="2026-05-31T14:26:00Z",
+                ended_at="2026-05-31T14:26:01.500000Z",
+            ),
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=2.0,
+                started_at="2026-05-31T14:26:01.500000Z",
+                ended_at="2026-05-31T14:26:03.500000Z",
+            ),
+        ]
+    )
+
+    run_conversation(
+        conversation=conversation,
+        agent=agent,
+        workspace=tmp_path,
+        adapter=adapter,
+        run_command=lambda _command: next(calls),
+        run_id="2026-05-31T14-26-00",
+        started_at="2026-05-31T14:26:00Z",
+        progress_factory=progress_factory,
+    )
+
+    assert len(progress_factory.created) == 1
+    progress_bar = progress_factory.created[0]
+    assert progress_bar.total == 2
+    assert progress_bar.unit == "prompt"
+    assert progress_bar.descriptions == [
+        "prompt 1/2: Do this",
+        "prompt 2/2: Explain that",
+    ]
+    assert progress_bar.updated == [1, 1]
+    assert progress_bar.closed is True
+
+
+def test_run_conversation_closes_progress_bar_after_nonzero_exit(tmp_path: Path) -> None:
+    conversation = Conversation(
+        name="sample",
+        source_workspace=tmp_path,
+        prompts=[
+            Prompt(text="Do this"),
+            Prompt(text="Explain that"),
+        ],
+    )
+    agent = AgentConfig(
+        id="open-fast",
+        frontend="opencode",
+        model="mtplx/mtplx-qwen36-27b-optimized-speed",
+    )
+    adapter = FakeAdapter()
+    progress_factory = FakeProgressFactory()
+
+    calls = iter(
+        [
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=1,
+                duration_seconds=1.5,
+                started_at="2026-05-31T14:26:00Z",
+                ended_at="2026-05-31T14:26:01.500000Z",
+            ),
+        ]
+    )
+
+    result = run_conversation(
+        conversation=conversation,
+        agent=agent,
+        workspace=tmp_path,
+        adapter=adapter,
+        run_command=lambda _command: next(calls),
+        run_id="2026-05-31T14-26-00",
+        started_at="2026-05-31T14:26:00Z",
+        progress_factory=progress_factory,
+    )
+
+    progress_bar = progress_factory.created[0]
+    assert result.status == "failed"
+    assert progress_bar.updated == [1]
+    assert progress_bar.closed is True
 
 
 def test_run_conversation_records_status_and_execution_timestamps(tmp_path: Path) -> None:
