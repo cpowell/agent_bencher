@@ -40,8 +40,8 @@ def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> No
         name="sample",
         source_workspace=tmp_path,
         prompts=[
-            Prompt(id="one", text="Do this"),
-            Prompt(id="two", text="Explain that"),
+            Prompt(text="Do this"),
+            Prompt(text="Explain that"),
         ],
     )
     agent = AgentConfig(
@@ -76,14 +76,16 @@ def test_run_conversation_reuses_session_id_across_prompts(tmp_path: Path) -> No
     assert result.prompts_completed == 2
     assert result.turns[0].started_at == "2026-05-31T14:26:00Z"
     assert result.turns[0].ended_at == "2026-05-31T14:26:01.500000Z"
+    assert result.turns[0].prompt_id == "01"
     assert result.turns[1].session_id == "session-123"
+    assert result.turns[1].prompt_id == "02"
 
 
 def test_run_conversation_records_status_and_execution_timestamps(tmp_path: Path) -> None:
     conversation = Conversation(
         name="sample",
         source_workspace=tmp_path,
-        prompts=[Prompt(id="one", text="Do this")],
+        prompts=[Prompt(text="Do this")],
     )
     agent = AgentConfig(
         id="open-fast",
@@ -124,7 +126,7 @@ def test_run_conversation_uses_agent_execution_time_not_bookkeeping(tmp_path: Pa
     conversation = Conversation(
         name="sample",
         source_workspace=tmp_path,
-        prompts=[Prompt(id="one", text="Do this"), Prompt(id="two", text="Explain that")],
+        prompts=[Prompt(text="Do this"), Prompt(text="Explain that")],
     )
     agent = AgentConfig(
         id="open-fast",

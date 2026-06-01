@@ -6,7 +6,6 @@ from pathlib import Path
 
 @dataclass(slots=True)
 class Prompt:
-    id: str
     text: str
 
 

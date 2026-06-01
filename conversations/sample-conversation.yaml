@@ -1,7 +1,8 @@
 name: sample-conversation
-source_workspace: /Users/chris/Code/python/agent_bencher
+source_workspace: ..
 prompts:
-  - id: inspect
-    text: "Inspect this repository and tell me, in 3 concise bullets, what the benchmark harness currently does."
-  - id: summarize
-    text: "Now summarize the current architecture in 2 short paragraphs, focusing on how a benchmark suite gets executed."
+  - text: "Describe the MVC Pattern in software engineering."
+  - text: "Inspect this repository and tell me, in 3 concise bullets, what the benchmark harness currently does."
+  - text: "Now summarize the current architecture in 2 short paragraphs, focusing on how a benchmark suite gets executed."
+  - text: "Finally, can you suggest 3 improvements to the current architecture that would make it more efficient or easier to use?"
+  - text: "For each of the 3 improvements you suggested, can you provide a brief implementation plan outlining the steps needed to achieve it?"

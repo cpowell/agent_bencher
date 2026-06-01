@@ -4,6 +4,11 @@ from pathlib import Path
 
 from agent_bencher.models import AgentConfig, Conversation, SessionResult, TokenUsage, TurnResult
 
+
+def _format_prompt_id(index: int) -> str:
+    return f"{index + 1:02d}"
+
+
 def run_conversation(
     *,
     conversation: Conversation,
@@ -37,7 +42,7 @@ def run_conversation(
 
         turns.append(
             TurnResult(
-                prompt_id=prompt.id,
+                prompt_id=_format_prompt_id(index),
                 prompt_text=prompt.text,
                 session_id=session_id,
                 exit_code=completed.exit_code,

@@ -9,11 +9,12 @@ from agent_bencher.models import AgentConfig, Conversation, Prompt
 
 def load_conversation(path: Path) -> Conversation:
     data = yaml.safe_load(path.read_text())
-    prompts = [Prompt(id=item["id"], text=item["text"]) for item in data["prompts"]]
+    prompts = [Prompt(text=item["text"]) for item in data["prompts"]]
+    source_workspace = (path.parent / data["source_workspace"]).resolve()
 
     return Conversation(
         name=data["name"],
-        source_workspace=Path(data["source_workspace"]),
+        source_workspace=source_workspace,
         prompts=prompts,
     )
 

@@ -16,7 +16,7 @@ def test_opencode_start_command_uses_real_cli_shape(tmp_path: Path) -> None:
     )
 
     command = adapter.build_start_command(
-        prompt=Prompt(id="intro", text="Reply with exactly OK"),
+        prompt=Prompt(text="Reply with exactly OK"),
         variant=agent,
         workspace=tmp_path,
     )
