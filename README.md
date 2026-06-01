@@ -2,8 +2,6 @@
 
 Benchmark real agent frontends over a multi-turn conversation.
 
-Before the first measured turn, the harness runs an automatic frontend-specific warmup request inferred from the run config. That warmup is not included in benchmark timing or token metrics.
-
 ## Layout
 
 - `conversations/`: ordered prompt sequences to replay

@@ -141,6 +141,9 @@ def test_write_results_emits_human_readable_conversation_markdown(tmp_path: Path
     assert "Summarize the findings" in conversation
     assert "Here is the summary." in conversation
     assert "private" not in conversation
+    assert "## Turn 1" in conversation
+    assert "## Turn 2" in conversation
+    assert "## Turn 2: summarize" not in conversation
     assert "### Prompt (" in conversation
     assert "### Response (" in conversation
     assert "T+0.00s" in conversation

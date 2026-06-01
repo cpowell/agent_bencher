@@ -32,29 +32,6 @@ def test_opencode_start_command_uses_real_cli_shape(tmp_path: Path) -> None:
     ]
 
 
-def test_opencode_warmup_command_reuses_model_args_and_env(tmp_path: Path) -> None:
-    adapter = OpenCodeAdapter()
-    agent = AgentConfig(
-        id="open-fast",
-        frontend="opencode",
-        model="mtplx/mtplx-qwen36-27b-optimized-speed",
-        args=["--format", "json"],
-        env={"FOO": "bar"},
-    )
-
-    command = adapter.build_warmup_command(variant=agent, workspace=tmp_path)
-
-    assert command.argv == [
-        "opencode",
-        "run",
-        "--format",
-        "json",
-        "-m",
-        "mtplx/mtplx-qwen36-27b-optimized-speed",
-        "Reply with exactly OK. This is a benchmark warmup run.",
-    ]
-    assert command.env == {"FOO": "bar"}
-
 
 def test_claude_parser_reads_usage_and_session_id_from_json_fixture() -> None:
     payload = Path("tests/fixtures/claude-turn.json").read_text()
@@ -125,25 +102,13 @@ def test_opencode_parser_reads_usage_and_session_id_from_jsonl_fixture() -> None
     assert parsed["token_usage"]["output"] == 80
 
 
-def test_claude_warmup_command_reuses_args_and_env(tmp_path: Path) -> None:
-    adapter = ClaudeAdapter()
-    agent = AgentConfig(
-        id="claude-fast",
-        frontend="claude",
-        model="Qwen3.6-27B-4bit",
-        args=["--output-format", "json", "--model", "opus"],
-        env={"ANTHROPIC_BASE_URL": "http://127.0.0.1:8000"},
-    )
+def test_opencode_parser_surfaces_error_events_as_fatal() -> None:
+    payload = """
+{"type":"step_start","sessionID":"opencode-session-123","part":{"type":"step-start"}}
+{"type":"error","sessionID":"opencode-session-123","error":{"name":"UnknownError","data":{"message":"boom"}}}
+"""
 
-    command = adapter.build_warmup_command(variant=agent, workspace=tmp_path)
+    parsed = OpenCodeAdapter().parse_turn_output(stdout=payload, stderr="")
 
-    assert command.argv == [
-        "claude",
-        "-p",
-        "Reply with exactly OK. This is a benchmark warmup run.",
-        "--output-format",
-        "json",
-        "--model",
-        "opus",
-    ]
-    assert command.env == {"ANTHROPIC_BASE_URL": "http://127.0.0.1:8000"}
+    assert parsed["session_id"] == "opencode-session-123"
+    assert parsed["fatal_error"] == "UnknownError: boom"

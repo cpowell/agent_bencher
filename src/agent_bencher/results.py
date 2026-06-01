@@ -292,7 +292,7 @@ def _write_combined_conversation_artifact(*, output_dir: Path, session: SessionR
         response_end_time = f"{_format_wall_clock(turn.ended_at)}, {_format_t_plus(reference=session.started_at, value=turn.ended_at)}"
         lines.extend(
             [
-                f"## Turn {turn_index}: {turn.prompt_id}",
+                f"## Turn {turn_index}",
                 "",
                 f"### Prompt ({prompt_time})",
                 turn.prompt_text,

@@ -5,6 +5,42 @@ from pathlib import Path
 from agent_bencher.models import AgentConfig, Conversation, SessionResult, TokenUsage, TurnResult
 
 
+def _excerpt(value: str, *, limit: int = 400) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
+def _build_turn_failure_message(
+    *,
+    turn_index: int,
+    prompt_text: str,
+    agent: AgentConfig,
+    fatal_error: str,
+    stdout: str,
+    stderr: str,
+) -> str:
+    lines = [
+        f"turn {turn_index} failed",
+        f"frontend: {agent.frontend}",
+        f"model: {agent.model}",
+        f"prompt: {prompt_text}",
+        f"error: {fatal_error}",
+    ]
+
+    stdout_excerpt = _excerpt(stdout)
+    stderr_excerpt = _excerpt(stderr)
+    if stdout_excerpt:
+        lines.append(f"stdout: {stdout_excerpt}")
+    if stderr_excerpt:
+        lines.append(f"stderr: {stderr_excerpt}")
+
+    return "\n".join(lines)
+
+
 def _format_prompt_id(index: int) -> str:
     return f"{index + 1:02d}"
 
@@ -23,9 +59,6 @@ def run_conversation(
     turns: list[TurnResult] = []
     session_id = ""
     execution_duration = 0.0
-    warmup = run_command(adapter.build_warmup_command(variant=agent, workspace=workspace))
-    if warmup.exit_code != 0:
-        raise RuntimeError(f"warmup failed with exit code {warmup.exit_code}: {warmup.stderr or warmup.stdout}")
 
     for index, prompt in enumerate(conversation.prompts):
         if index == 0:
@@ -40,6 +73,18 @@ def run_conversation(
 
         completed = run_command(command)
         parsed = adapter.parse_turn_output(stdout=completed.stdout, stderr=completed.stderr)
+        fatal_error = parsed.get("fatal_error")
+        if fatal_error:
+            raise RuntimeError(
+                _build_turn_failure_message(
+                    turn_index=index + 1,
+                    prompt_text=prompt.text,
+                    agent=agent,
+                    fatal_error=fatal_error,
+                    stdout=completed.stdout,
+                    stderr=completed.stderr,
+                )
+            )
         session_id = parsed["session_id"]
         execution_duration += completed.duration_seconds
 
