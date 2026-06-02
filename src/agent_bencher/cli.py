@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 import shutil
+import sys
 
 from agent_bencher.adapters import get_adapter
 from agent_bencher.batch import build_batch_result
@@ -16,6 +17,10 @@ from agent_bencher.workspace import prepare_variant_workspace
 
 def format_run_id(date_part: str, time_part: str) -> str:
     return f"{date_part}T{time_part.replace(':', '-')}"
+
+
+def format_display_time(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def positive_int(value: str) -> int:
@@ -74,38 +79,45 @@ def main(argv: list[str] | None = None) -> int:
     batch_id = format_run_id(now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"))
     batch_output_dir = args.output_dir / conversation.name / agent.id / batch_id
     sessions = []
+    print(f"Run started at {format_display_time(now)}", file=sys.stderr, flush=True)
+    try:
+        for trial_index in range(args.runs):
+            trial_started_at = datetime.now(timezone.utc)
+            trial_run_id = (
+                f"{format_run_id(trial_started_at.strftime('%Y-%m-%d'), trial_started_at.strftime('%H:%M:%S'))}"
+                f"-trial-{trial_index + 1:03d}"
+            )
+            prepared = prepare_variant_workspace(
+                source_workspace=conversation.source_workspace,
+                run_root=args.output_dir,
+                suite_name=conversation.name,
+                variant_id=agent.id,
+            )
+            session = run_conversation(
+                conversation=conversation,
+                agent=agent,
+                workspace=prepared.variant_workspace,
+                adapter=adapter,
+                run_command=run_command,
+                run_id=trial_run_id,
+                started_at=trial_started_at.isoformat(),
+                comment=args.comment,
+            )
+            sessions.append(session)
+            if session.status == "completed":
+                shutil.rmtree(prepared.variant_workspace.parent)
 
-    for trial_index in range(args.runs):
-        trial_started_at = datetime.now(timezone.utc)
-        trial_run_id = (
-            f"{format_run_id(trial_started_at.strftime('%Y-%m-%d'), trial_started_at.strftime('%H:%M:%S'))}"
-            f"-trial-{trial_index + 1:03d}"
-        )
-        prepared = prepare_variant_workspace(
-            source_workspace=conversation.source_workspace,
-            run_root=args.output_dir,
-            suite_name=conversation.name,
-            variant_id=agent.id,
-        )
-        session = run_conversation(
-            conversation=conversation,
-            agent=agent,
-            workspace=prepared.variant_workspace,
-            adapter=adapter,
-            run_command=run_command,
-            run_id=trial_run_id,
-            started_at=trial_started_at.isoformat(),
+        batch = build_batch_result(
+            batch_id=batch_id,
+            requested_runs=args.runs,
             comment=args.comment,
+            sessions=sessions,
         )
-        sessions.append(session)
-        if session.status == "completed":
-            shutil.rmtree(prepared.variant_workspace.parent)
-
-    batch = build_batch_result(
-        batch_id=batch_id,
-        requested_runs=args.runs,
-        comment=args.comment,
-        sessions=sessions,
-    )
-    write_batch_results(batch=batch, output_dir=batch_output_dir)
-    return 0
+        write_batch_results(batch=batch, output_dir=batch_output_dir)
+        return 0
+    finally:
+        print(
+            f"Run concluded at {format_display_time(datetime.now(timezone.utc))}",
+            file=sys.stderr,
+            flush=True,
+        )

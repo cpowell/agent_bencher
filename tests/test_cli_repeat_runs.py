@@ -1,5 +1,6 @@
 from pathlib import Path
 import pytest
+import re
 
 from agent_bencher.cli import build_parser, main
 from agent_bencher.models import AgentConfig, Conversation, Prompt, SessionResult, TokenUsage, TurnResult
@@ -231,3 +232,51 @@ def test_main_keeps_failed_trial_workspaces(monkeypatch, tmp_path: Path) -> None
     assert exit_code == 0
     assert workspace_roots
     assert workspace_roots[0].exists()
+
+
+def test_main_prints_run_start_and_end_timestamps(monkeypatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_conversation",
+        lambda _path: Conversation(
+            name="sample-conversation",
+            source_workspace=tmp_path / "source",
+            prompts=[Prompt(text="Do this")],
+        ),
+    )
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_agent_config",
+        lambda _path: AgentConfig(id="open-fast", frontend="opencode", model="model-x"),
+    )
+
+    class PreparedWorkspace:
+        def __init__(self, path: Path) -> None:
+            self.variant_workspace = path
+
+    def fake_prepare_variant_workspace(*, source_workspace: Path, run_root: Path, suite_name: str, variant_id: str):
+        root = tmp_path / "hex-1"
+        workspace = root / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        (root / "artifacts").mkdir(exist_ok=True)
+        return PreparedWorkspace(workspace)
+
+    monkeypatch.setattr("agent_bencher.cli.prepare_variant_workspace", fake_prepare_variant_workspace)
+    monkeypatch.setattr("agent_bencher.cli.get_adapter", lambda _frontend: object())
+    monkeypatch.setattr("agent_bencher.cli.run_command", lambda _command: None)
+    monkeypatch.setattr("agent_bencher.cli.write_batch_results", lambda **kwargs: None)
+    monkeypatch.setattr("agent_bencher.cli.run_conversation", lambda **kwargs: _make_session(run_id="run-1"))
+
+    exit_code = main(
+        [
+            "bench",
+            "run_configs/opencode.yaml",
+            "conversations/sample.yaml",
+            "--output-dir",
+            str(tmp_path / "runs"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert re.search(r"Run started at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured.err)
+    assert re.search(r"Run concluded at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured.err)
