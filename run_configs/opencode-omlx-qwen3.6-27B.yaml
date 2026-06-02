@@ -1,0 +1,7 @@
+id: opencode-omlx-qwen36-27b-4bit
+frontend: opencode
+model: omlx/Qwen3.6-27B-4bit
+args:
+  - --format
+  - json
+env: {}
