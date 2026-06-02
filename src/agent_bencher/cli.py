@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
+import shutil
 
 from agent_bencher.adapters import get_adapter
 from agent_bencher.batch import build_batch_result
@@ -97,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
             comment=args.comment,
         )
         sessions.append(session)
+        if session.status == "completed":
+            shutil.rmtree(prepared.variant_workspace.parent)
 
     batch = build_batch_result(
         batch_id=batch_id,

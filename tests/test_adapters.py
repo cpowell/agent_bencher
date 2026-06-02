@@ -92,6 +92,41 @@ def test_claude_parser_tolerates_string_result_entries() -> None:
     assert parsed["token_usage"]["output"] == 0
 
 
+def test_claude_parser_recovers_usage_from_malformed_json() -> None:
+    payload = """
+{
+  "session_id": "claude-session-broken",
+  "result": {
+    "session_id": "claude-session-broken",
+    "usage": {
+      "input_tokens": 321,
+      "output_tokens": 123,
+      "reasoning_tokens": 7,
+      "cache_read_input_tokens": 11,
+      "cache_creation_input_tokens": 13
+    },
+    "text": "unterminated
+"""
+
+    parsed = ClaudeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == "claude-session-broken"
+    assert parsed["token_usage"]["input"] == 321
+    assert parsed["token_usage"]["output"] == 123
+    assert parsed["token_usage"]["reasoning"] == 7
+    assert parsed["token_usage"]["cache_read"] == 11
+    assert parsed["token_usage"]["cache_write"] == 13
+
+
+def test_claude_parser_surfaces_unrecoverable_malformed_json_as_fatal() -> None:
+    payload = '{"text": "unterminated'
+
+    parsed = ClaudeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == ""
+    assert parsed["fatal_error"].startswith("ClaudeOutputParseError:")
+
+
 def test_opencode_parser_reads_usage_and_session_id_from_jsonl_fixture() -> None:
     payload = Path("tests/fixtures/opencode-turn.jsonl").read_text()
 
