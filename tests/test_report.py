@@ -1,8 +1,9 @@
 from pathlib import Path
 
+from agent_bencher.batch import build_batch_result
 from agent_bencher.cli import build_parser, format_run_id
 from agent_bencher.models import SessionResult, TokenUsage, TurnResult
-from agent_bencher.report import build_markdown_report
+from agent_bencher.report import build_batch_markdown_report, build_markdown_report
 
 
 def test_build_markdown_report_includes_session_summary() -> None:
@@ -120,3 +121,69 @@ def test_build_parser_accepts_comment_arg() -> None:
     )
 
     assert parsed.comment == "nightly regression sweep"
+
+
+def test_build_batch_markdown_report_lists_failed_trials_and_aggregate_metrics() -> None:
+    successful = SessionResult(
+        run_id="run-1",
+        conversation_name="sample-conversation",
+        agent_id="open-fast",
+        frontend="opencode",
+        backend_model="sample-model",
+        session_id="session-1",
+        started_at="2026-06-01T00:00:00Z",
+        ended_at="2026-06-01T00:00:01Z",
+        duration_seconds=1.0,
+        status="completed",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="session-1",
+                exit_code=0,
+                duration_seconds=1.0,
+                stdout="{}",
+                stderr="",
+                token_usage=TokenUsage(input=100, output=40),
+            )
+        ],
+        comment="",
+    )
+    failed = SessionResult(
+        run_id="run-2",
+        conversation_name="sample-conversation",
+        agent_id="open-fast",
+        frontend="opencode",
+        backend_model="sample-model",
+        session_id="session-2",
+        started_at="2026-06-01T00:00:02Z",
+        ended_at="2026-06-01T00:00:03Z",
+        duration_seconds=2.0,
+        status="failed",
+        prompts_attempted=1,
+        prompts_completed=0,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="session-2",
+                exit_code=1,
+                duration_seconds=2.0,
+                stdout="{}",
+                stderr="boom",
+                token_usage=TokenUsage(input=10, output=1),
+            )
+        ],
+        comment="",
+    )
+
+    batch = build_batch_result(batch_id="batch-1", requested_runs=2, comment="", sessions=[successful, failed])
+    report = build_batch_markdown_report(batch)
+
+    assert "# Benchmark Batch Summary" in report
+    assert "successful runs: 1/2" in report
+    assert "failed runs: 1" in report
+    assert "duration_seconds" in report
+    assert "trial-002" in report

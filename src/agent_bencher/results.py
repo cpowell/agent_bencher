@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
-from agent_bencher.models import SessionResult, TurnResult
-from agent_bencher.report import build_markdown_report
+from agent_bencher.models import BatchResult, SessionResult, TurnResult
+from agent_bencher.report import build_batch_markdown_report, build_markdown_report
 
 
 def _write_turn_transcripts(*, output_dir: Path, turn: TurnResult, turn_index: int) -> None:
@@ -104,6 +104,54 @@ def _serialize_run(session: SessionResult, *, conversation_path: str, transcript
         "total_cache_write_tokens": total_cache_write_tokens,
         "conversation_path": conversation_path,
         "transcript_dir": transcript_dir,
+    }
+
+
+def _serialize_batch(batch: BatchResult) -> dict:
+    return {
+        "batch_id": batch.batch_id,
+        "conversation_name": batch.conversation_name,
+        "agent_id": batch.agent_id,
+        "frontend": batch.frontend,
+        "backend_model": batch.backend_model,
+        "comment": batch.comment,
+        "requested_runs": batch.requested_runs,
+        "successful_runs": batch.successful_runs,
+        "failed_runs": batch.failed_runs,
+        "started_at": batch.started_at,
+        "ended_at": batch.ended_at,
+        "duration_seconds": batch.duration_seconds,
+        "status": batch.status,
+        "run_metrics": {
+            name: {
+                "mean": summary.mean,
+                "min": summary.min,
+                "max": summary.max,
+                "stddev": summary.stddev,
+            }
+            for name, summary in batch.run_metrics.items()
+        },
+        "turn_metrics": [
+            {
+                name: {
+                    "mean": summary.mean,
+                    "min": summary.min,
+                    "max": summary.max,
+                    "stddev": summary.stddev,
+                }
+                for name, summary in turn_metrics.items()
+            }
+            for turn_metrics in batch.turn_metrics
+        ],
+        "trials": [
+            {
+                "trial_id": f"trial-{index:03d}",
+                "run_id": session.run_id,
+                "status": session.status,
+                "path": f"trials/trial-{index:03d}",
+            }
+            for index, session in enumerate(batch.sessions, start=1)
+        ],
     }
 
 
@@ -320,28 +368,44 @@ def _write_combined_conversation_artifact(*, output_dir: Path, session: SessionR
     return destination
 
 
+def write_trial_results(*, session: SessionResult, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for turn_index, turn in enumerate(session.turns, start=1):
+        _write_turn_transcripts(output_dir=output_dir, turn=turn, turn_index=turn_index)
+
+    conversation_path = str(_write_combined_conversation_artifact(output_dir=output_dir, session=session))
+    transcript_dir = str(output_dir / "transcripts")
+
+    turns_destination = output_dir / "turns.jsonl"
+    turns_destination.write_text(
+        "\n".join(
+            json.dumps(_serialize_turn(turn, run_id=session.run_id, turn_index=index))
+            for index, turn in enumerate(session.turns, start=1)
+        )
+        + "\n"
+    )
+
+    run_destination = output_dir / "run.json"
+    run_destination.write_text(
+        json.dumps(_serialize_run(session, conversation_path=conversation_path, transcript_dir=transcript_dir), indent=2)
+    )
+
+    (output_dir / "summary.md").write_text(build_markdown_report([session]))
+
+
 def write_results(*, sessions: list[SessionResult], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-
     for session in sessions:
-        for turn_index, turn in enumerate(session.turns, start=1):
-            _write_turn_transcripts(output_dir=output_dir, turn=turn, turn_index=turn_index)
-
-        conversation_path = str(_write_combined_conversation_artifact(output_dir=output_dir, session=session))
-        transcript_dir = str(output_dir / "transcripts")
-
-        turns_destination = output_dir / "turns.jsonl"
-        turns_destination.write_text(
-            "\n".join(
-                json.dumps(_serialize_turn(turn, run_id=session.run_id, turn_index=index))
-                for index, turn in enumerate(session.turns, start=1)
-            )
-            + "\n"
-        )
-
-        run_destination = output_dir / "run.json"
-        run_destination.write_text(
-            json.dumps(_serialize_run(session, conversation_path=conversation_path, transcript_dir=transcript_dir), indent=2)
-        )
+        write_trial_results(session=session, output_dir=output_dir)
 
     (output_dir / "summary.md").write_text(build_markdown_report(sessions))
+
+
+def write_batch_results(*, batch: BatchResult, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trials_dir = output_dir / "trials"
+    for index, session in enumerate(batch.sessions, start=1):
+        write_trial_results(session=session, output_dir=trials_dir / f"trial-{index:03d}")
+
+    (output_dir / "batch.json").write_text(json.dumps(_serialize_batch(batch), indent=2) + "\n")
+    (output_dir / "summary.md").write_text(build_batch_markdown_report(batch))

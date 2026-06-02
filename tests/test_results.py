@@ -1,8 +1,9 @@
 from pathlib import Path
 import json
 
+from agent_bencher.batch import build_batch_result
 from agent_bencher.models import SessionResult, TokenUsage, TurnResult
-from agent_bencher.results import write_results
+from agent_bencher.results import write_batch_results, write_results
 
 
 def test_write_results_emits_compact_run_json_and_turns_jsonl(tmp_path: Path) -> None:
@@ -192,3 +193,42 @@ def test_write_results_uses_zero_throughput_for_zero_duration(tmp_path: Path) ->
     assert run_payload["effective_total_throughput_tps"] == 0.0
     assert turn_payload["output_tps"] == 0.0
     assert turn_payload["total_throughput_tps"] == 0.0
+
+
+def test_write_batch_results_uses_batch_first_layout(tmp_path: Path) -> None:
+    session = SessionResult(
+        run_id="run-1",
+        conversation_name="sample-conversation",
+        agent_id="open-fast",
+        frontend="opencode",
+        backend_model="sample-model",
+        session_id="session-1",
+        started_at="2026-06-01T00:00:00Z",
+        ended_at="2026-06-01T00:00:01Z",
+        duration_seconds=1.0,
+        status="completed",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="session-1",
+                exit_code=0,
+                duration_seconds=1.0,
+                stdout="assistant output",
+                stderr="",
+                token_usage=TokenUsage(input=100, output=40),
+            )
+        ],
+        comment="",
+    )
+    batch = build_batch_result(batch_id="batch-1", requested_runs=1, comment="", sessions=[session])
+
+    write_batch_results(batch=batch, output_dir=tmp_path)
+
+    batch_payload = json.loads((tmp_path / "batch.json").read_text())
+    assert batch_payload["batch_id"] == "batch-1"
+    assert (tmp_path / "summary.md").exists()
+    assert (tmp_path / "trials" / "trial-001" / "run.json").exists()
+    assert (tmp_path / "trials" / "trial-001" / "turns.jsonl").exists()

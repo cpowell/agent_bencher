@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_bencher.models import SessionResult
+from agent_bencher.models import BatchResult, SessionResult
 
 
 def _safe_divide(numerator: float, denominator: float) -> float:
@@ -58,3 +58,66 @@ def build_markdown_report(sessions: list[SessionResult]) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def build_batch_markdown_report(batch: BatchResult) -> str:
+    lines = [
+        "# Benchmark Batch Summary",
+        "",
+        f"- batch id: {batch.batch_id}",
+        f"- conversation: {batch.conversation_name}",
+        f"- agent: {batch.agent_id}",
+        f"- frontend: {batch.frontend}",
+        f"- backend model: {batch.backend_model}",
+        f"- status: {batch.status}",
+        f"- successful runs: {batch.successful_runs}/{batch.requested_runs}",
+        f"- failed runs: {batch.failed_runs}",
+        f"- duration: {batch.duration_seconds:.2f}s",
+    ]
+    if batch.comment:
+        lines.append(f"- comment: {batch.comment}")
+
+    lines.extend(
+        [
+            "",
+            "## Run-Level Aggregates",
+            "",
+            "| Metric | Mean | Min | Max | Stddev |",
+            "| --- | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for metric_name, summary in batch.run_metrics.items():
+        lines.append(
+            f"| {metric_name} | {summary.mean:.2f} | {summary.min:.2f} | {summary.max:.2f} | {summary.stddev:.2f} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Per-Turn Aggregates",
+            "",
+            "| Turn | Metric | Mean | Min | Max | Stddev |",
+            "| --- | --- | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for turn_index, turn_metrics in enumerate(batch.turn_metrics, start=1):
+        for metric_name, summary in turn_metrics.items():
+            lines.append(
+                f"| {turn_index} | {metric_name} | {summary.mean:.2f} | {summary.min:.2f} | {summary.max:.2f} | {summary.stddev:.2f} |"
+            )
+
+    lines.extend(
+        [
+            "",
+            "## Trials",
+            "",
+            "| Trial | Run ID | Status | Path |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for index, session in enumerate(batch.sessions, start=1):
+        lines.append(
+            f"| trial-{index:03d} | {session.run_id} | {session.status} | `trials/trial-{index:03d}` |"
+        )
+
+    return "\n".join(lines) + "\n"

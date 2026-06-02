@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_bencher.adapters import get_adapter
+from agent_bencher.batch import build_batch_result
 from agent_bencher.process import run_command
-from agent_bencher.results import write_results
+from agent_bencher.results import write_batch_results
 from agent_bencher.runner import run_conversation
 from agent_bencher.suite import load_agent_config, load_conversation
 from agent_bencher.workspace import prepare_variant_workspace
@@ -14,6 +15,13 @@ from agent_bencher.workspace import prepare_variant_workspace
 
 def format_run_id(date_part: str, time_part: str) -> str:
     return f"{date_part}T{time_part.replace(':', '-')}"
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,6 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("runs"),
         help="Directory where run artifacts are written. Default: runs",
     )
+    bench.add_argument(
+        "--runs",
+        type=positive_int,
+        default=1,
+        help="Number of repeated trials to execute. Default: 1",
+    )
 
     return parser
 
@@ -55,27 +69,40 @@ def main(argv: list[str] | None = None) -> int:
     conversation = load_conversation(args.conversation)
     agent = load_agent_config(args.run_config)
     now = datetime.now(timezone.utc)
-    run_id = format_run_id(now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"))
-    started_at = now.isoformat()
-    run_output_dir = args.output_dir / conversation.name / agent.id / run_id
-
-    prepared = prepare_variant_workspace(
-        source_workspace=conversation.source_workspace,
-        run_root=args.output_dir,
-        suite_name=conversation.name,
-        variant_id=agent.id,
-    )
     adapter = get_adapter(agent.frontend)
-    session = run_conversation(
-        conversation=conversation,
-        agent=agent,
-        workspace=prepared.variant_workspace,
-        adapter=adapter,
-        run_command=run_command,
-        run_id=run_id,
-        started_at=started_at,
-        comment=args.comment,
-    )
+    batch_id = format_run_id(now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"))
+    batch_output_dir = args.output_dir / conversation.name / agent.id / batch_id
+    sessions = []
 
-    write_results(sessions=[session], output_dir=run_output_dir)
+    for trial_index in range(args.runs):
+        trial_started_at = datetime.now(timezone.utc)
+        trial_run_id = (
+            f"{format_run_id(trial_started_at.strftime('%Y-%m-%d'), trial_started_at.strftime('%H:%M:%S'))}"
+            f"-trial-{trial_index + 1:03d}"
+        )
+        prepared = prepare_variant_workspace(
+            source_workspace=conversation.source_workspace,
+            run_root=args.output_dir,
+            suite_name=conversation.name,
+            variant_id=agent.id,
+        )
+        session = run_conversation(
+            conversation=conversation,
+            agent=agent,
+            workspace=prepared.variant_workspace,
+            adapter=adapter,
+            run_command=run_command,
+            run_id=trial_run_id,
+            started_at=trial_started_at.isoformat(),
+            comment=args.comment,
+        )
+        sessions.append(session)
+
+    batch = build_batch_result(
+        batch_id=batch_id,
+        requested_runs=args.runs,
+        comment=args.comment,
+        sessions=sessions,
+    )
+    write_batch_results(batch=batch, output_dir=batch_output_dir)
     return 0

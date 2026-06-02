@@ -67,3 +67,31 @@ class SessionResult:
     prompts_completed: int
     turns: list[TurnResult]
     comment: str = ""
+
+
+@dataclass(slots=True)
+class MetricSummary:
+    mean: float
+    min: float
+    max: float
+    stddev: float
+
+
+@dataclass(slots=True)
+class BatchResult:
+    batch_id: str
+    conversation_name: str
+    agent_id: str
+    frontend: str
+    backend_model: str
+    comment: str
+    requested_runs: int
+    successful_runs: int
+    failed_runs: int
+    started_at: str
+    ended_at: str
+    duration_seconds: float
+    status: str
+    sessions: list[SessionResult]
+    run_metrics: dict[str, MetricSummary]
+    turn_metrics: list[dict[str, MetricSummary]]
