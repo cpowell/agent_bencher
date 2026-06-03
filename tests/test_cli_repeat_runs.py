@@ -280,3 +280,117 @@ def test_main_prints_run_start_and_end_timestamps(monkeypatch, tmp_path: Path, c
     assert exit_code == 0
     assert re.search(r"Run started at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured.err)
     assert re.search(r"Run concluded at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured.err)
+
+
+def test_main_handles_keyboard_interrupt_with_polite_message(monkeypatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_conversation",
+        lambda _path: Conversation(
+            name="sample-conversation",
+            source_workspace=tmp_path / "source",
+            prompts=[Prompt(text="Do this")],
+        ),
+    )
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_agent_config",
+        lambda _path: AgentConfig(id="open-fast", frontend="opencode", model="model-x"),
+    )
+
+    class PreparedWorkspace:
+        def __init__(self, path: Path) -> None:
+            self.variant_workspace = path
+
+    def fake_prepare_variant_workspace(*, source_workspace: Path, run_root: Path, suite_name: str, variant_id: str):
+        root = tmp_path / "hex-1"
+        workspace = root / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        (root / "artifacts").mkdir(exist_ok=True)
+        return PreparedWorkspace(workspace)
+
+    monkeypatch.setattr("agent_bencher.cli.prepare_variant_workspace", fake_prepare_variant_workspace)
+    monkeypatch.setattr("agent_bencher.cli.get_adapter", lambda _frontend: object())
+    monkeypatch.setattr("agent_bencher.cli.run_command", lambda _command: None)
+    monkeypatch.setattr("agent_bencher.cli.write_batch_results", lambda **kwargs: None)
+    monkeypatch.setattr("agent_bencher.cli.run_conversation", lambda **kwargs: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    exit_code = main(
+        [
+            "bench",
+            "run_configs/opencode.yaml",
+            "conversations/sample.yaml",
+            "--output-dir",
+            str(tmp_path / "runs"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 130
+    assert "Terminating early at user request" in captured.err
+    assert "KeyboardInterrupt" not in captured.err
+
+
+def test_main_writes_partial_batch_results_before_interrupt(monkeypatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_conversation",
+        lambda _path: Conversation(
+            name="sample-conversation",
+            source_workspace=tmp_path / "source",
+            prompts=[Prompt(text="Do this")],
+        ),
+    )
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_agent_config",
+        lambda _path: AgentConfig(id="open-fast", frontend="opencode", model="model-x"),
+    )
+
+    class PreparedWorkspace:
+        def __init__(self, path: Path) -> None:
+            self.variant_workspace = path
+
+    workspaces: list[Path] = []
+
+    def fake_prepare_variant_workspace(*, source_workspace: Path, run_root: Path, suite_name: str, variant_id: str):
+        root = tmp_path / f"hex-{len(workspaces) + 1}"
+        workspace = root / "workspace"
+        workspace.mkdir(parents=True)
+        (root / "artifacts").mkdir()
+        workspaces.append(root)
+        return PreparedWorkspace(workspace)
+
+    monkeypatch.setattr("agent_bencher.cli.prepare_variant_workspace", fake_prepare_variant_workspace)
+    monkeypatch.setattr("agent_bencher.cli.get_adapter", lambda _frontend: object())
+    monkeypatch.setattr("agent_bencher.cli.run_command", lambda _command: None)
+
+    calls: list[tuple[int, str, int]] = []
+
+    def fake_write_batch_results(*, batch, output_dir: Path) -> None:
+        calls.append((len(batch.sessions), batch.status, batch.requested_runs))
+
+    sessions = iter([_make_session(run_id="run-1")])
+
+    def fake_run_conversation(**kwargs):
+        if kwargs["run_id"].endswith("trial-001"):
+            return next(sessions)
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr("agent_bencher.cli.run_conversation", fake_run_conversation)
+    monkeypatch.setattr("agent_bencher.cli.write_batch_results", fake_write_batch_results)
+
+    exit_code = main(
+        [
+            "bench",
+            "run_configs/opencode.yaml",
+            "conversations/sample.yaml",
+            "--runs",
+            "3",
+            "--output-dir",
+            str(tmp_path / "runs"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 130
+    assert "Terminating early at user request" in captured.err
+    assert calls == [(1, "partial", 3), (1, "partial", 3)]

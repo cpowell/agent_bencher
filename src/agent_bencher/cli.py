@@ -15,6 +15,26 @@ from agent_bencher.suite import load_agent_config, load_conversation
 from agent_bencher.workspace import prepare_variant_workspace
 
 
+def _write_available_batch_results(
+    *,
+    batch_id: str,
+    requested_runs: int,
+    comment: str,
+    sessions: list,
+    output_dir: Path,
+) -> None:
+    if not sessions:
+        return
+
+    batch = build_batch_result(
+        batch_id=batch_id,
+        requested_runs=requested_runs,
+        comment=comment,
+        sessions=sessions,
+    )
+    write_batch_results(batch=batch, output_dir=output_dir)
+
+
 def format_run_id(date_part: str, time_part: str) -> str:
     return f"{date_part}T{time_part.replace(':', '-')}"
 
@@ -79,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     batch_id = format_run_id(now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"))
     batch_output_dir = args.output_dir / conversation.name / agent.id / batch_id
     sessions = []
+    interrupted = False
     print(f"Run started at {format_display_time(now)}", file=sys.stderr, flush=True)
     try:
         for trial_index in range(args.runs):
@@ -104,16 +125,33 @@ def main(argv: list[str] | None = None) -> int:
                 comment=args.comment,
             )
             sessions.append(session)
+            _write_available_batch_results(
+                batch_id=batch_id,
+                requested_runs=args.runs,
+                comment=args.comment,
+                sessions=sessions,
+                output_dir=batch_output_dir,
+            )
             if session.status == "completed":
                 shutil.rmtree(prepared.variant_workspace.parent)
-
-        batch = build_batch_result(
+    except KeyboardInterrupt:
+        interrupted = True
+        print("Terminating early at user request", file=sys.stderr, flush=True)
+        _write_available_batch_results(
             batch_id=batch_id,
             requested_runs=args.runs,
             comment=args.comment,
             sessions=sessions,
+            output_dir=batch_output_dir,
         )
-        write_batch_results(batch=batch, output_dir=batch_output_dir)
+    else:
+        _write_available_batch_results(
+            batch_id=batch_id,
+            requested_runs=args.runs,
+            comment=args.comment,
+            sessions=sessions,
+            output_dir=batch_output_dir,
+        )
         return 0
     finally:
         print(
@@ -121,3 +159,4 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
             flush=True,
         )
+    return 130 if interrupted else 0
