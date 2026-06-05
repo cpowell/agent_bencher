@@ -198,6 +198,8 @@ def _extract_assistant_text_from_payload(payload: dict) -> list[str]:
         )
 
     result = payload.get("result")
+    if isinstance(result, str) and result.strip():
+        extracted.append(result.strip())
     if isinstance(result, dict):
         for key in ("text", "message", "content"):
             extracted.extend(

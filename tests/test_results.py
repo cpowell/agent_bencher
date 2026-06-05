@@ -153,6 +153,56 @@ def test_write_results_emits_human_readable_conversation_markdown(tmp_path: Path
     assert run_payload["comment"] == "Benchmarking opencode against the repo after uv sync."
 
 
+def test_write_results_extracts_human_readable_text_from_top_level_claude_result(tmp_path: Path) -> None:
+    session = SessionResult(
+        run_id="2026-06-05T23-12-14-trial-001",
+        conversation_name="sample-conversation",
+        agent_id="claude-qwen35-122B-mtp",
+        frontend="claude",
+        backend_model="Qwen3.5-122B-A10B-4bit",
+        session_id="ca0d7a5c-bc30-402a-af2b-056ed6a9fba7",
+        started_at="2026-06-05T23:12:14.430000Z",
+        ended_at="2026-06-05T23:12:40.869657Z",
+        duration_seconds=26.1,
+        status="completed",
+        comment="MTP enabled",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Describe the MVC Pattern in software engineering.",
+                session_id="ca0d7a5c-bc30-402a-af2b-056ed6a9fba7",
+                exit_code=0,
+                duration_seconds=26.1,
+                started_at="2026-06-05T23:12:14.762104+00:00",
+                ended_at="2026-06-05T23:12:40.869657+00:00",
+                stdout=json.dumps(
+                    {
+                        "type": "result",
+                        "result": "# MVC Pattern\n\nThis is the assistant answer.",
+                        "session_id": "ca0d7a5c-bc30-402a-af2b-056ed6a9fba7",
+                        "usage": {
+                            "input_tokens": 0,
+                            "output_tokens": 483,
+                        },
+                    }
+                ),
+                stderr="",
+                token_usage=TokenUsage(input=0, output=483),
+            ),
+        ],
+    )
+
+    write_results(sessions=[session], output_dir=tmp_path)
+
+    conversation = (tmp_path / "conversation.md").read_text()
+
+    assert "# MVC Pattern" in conversation
+    assert "This is the assistant answer." in conversation
+    assert "_No human-readable assistant text extracted._" not in conversation
+
+
 def test_write_results_uses_zero_throughput_for_zero_duration(tmp_path: Path) -> None:
     session = SessionResult(
         run_id="2026-05-31T14-26-00",
