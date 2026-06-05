@@ -1,0 +1,20 @@
+id: claude-qwen35-122B-mtp
+frontend: claude
+model: Qwen3.5-122B-A10B-4bit
+args:
+  - --output-format
+  - json
+  - --permission-mode
+  - bypassPermissions
+  - --model
+  - opus
+  - --tools
+  - "Bash,Read,Edit,Write,Glob,Grep,WebSearch,WebFetch"
+env:
+  ANTHROPIC_BASE_URL: http://127.0.0.1:8000
+  ANTHROPIC_AUTH_TOKEN: cbp8
+  ANTHROPIC_DEFAULT_OPUS_MODEL: Qwen3.5-122B-A10B-oQ4-mtp
+  ANTHROPIC_DEFAULT_SONNET_MODEL: Qwen3.5-122B-A10B-oQ4-mtp
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: Qwen3.5-122B-A10B-oQ4-mtp
+  API_TIMEOUT_MS: "3000000"
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
