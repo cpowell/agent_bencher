@@ -187,3 +187,38 @@ def test_build_batch_markdown_report_lists_failed_trials_and_aggregate_metrics()
     assert "failed runs: 1" in report
     assert "duration_seconds" in report
     assert "trial-002" in report
+
+
+def test_build_markdown_report_counts_cached_prompt_tokens_in_input_totals() -> None:
+    session = SessionResult(
+        run_id="2026-05-31T14-26-00",
+        conversation_name="sample-conversation",
+        agent_id="claude-cached",
+        frontend="claude",
+        backend_model="Qwen3.5-122B-A10B-4bit",
+        session_id="claude-session-123",
+        started_at="2026-05-31T14:26:00Z",
+        ended_at="2026-05-31T14:26:10Z",
+        duration_seconds=10.0,
+        status="completed",
+        comment="",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="claude-session-123",
+                exit_code=0,
+                duration_seconds=10.0,
+                stdout="{}",
+                stderr="",
+                token_usage=TokenUsage(input=0, output=40, cache_read=1000, cache_write=200),
+            )
+        ],
+    )
+
+    report = build_markdown_report([session])
+
+    assert "total input tokens: 1200" in report
+    assert "| 1 | 01 | 10.00 | 1200 | 40 | 4.00 | 124.00 |" in report

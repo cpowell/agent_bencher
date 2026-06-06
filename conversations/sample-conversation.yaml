@@ -2,6 +2,7 @@ name: sample-conversation
 source_workspace: ..
 prompts:
   - text: "Describe the MVC Pattern in software engineering."
+  - text: "Describe MCP as it applies to AI agents."
   - text: "Inspect this repository and tell me, in 3 concise bullets, what the benchmark harness currently does."
   - text: "Now summarize the current architecture in 2 short paragraphs, focusing on how a benchmark suite gets executed."
   - text: "Finally, can you suggest 3 improvements to the current architecture that would make it more efficient or easier to use?"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+from agent_bencher.metrics import prompt_input_tokens, total_prompt_input_tokens
 from agent_bencher.models import BatchResult, MetricSummary, SessionResult
 
 
@@ -22,7 +23,7 @@ def _summarize(values: list[float]) -> MetricSummary:
 
 
 def _total_input_tokens(session: SessionResult) -> int:
-    return sum(turn.token_usage.input for turn in session.turns)
+    return total_prompt_input_tokens(session)
 
 
 def _total_output_tokens(session: SessionResult) -> int:
@@ -61,14 +62,14 @@ def build_batch_result(*, batch_id: str, requested_runs: int, comment: str, sess
             turn_metrics.append(
                 {
                     "duration_seconds": _summarize([turn.duration_seconds for turn in turns]),
-                    "input_tokens": _summarize([float(turn.token_usage.input) for turn in turns]),
+                    "input_tokens": _summarize([float(prompt_input_tokens(turn)) for turn in turns]),
                     "output_tokens": _summarize([float(turn.token_usage.output) for turn in turns]),
                     "output_tps": _summarize(
                         [_safe_divide(turn.token_usage.output, turn.duration_seconds) for turn in turns]
                     ),
                     "total_throughput_tps": _summarize(
                         [
-                            _safe_divide(turn.token_usage.input + turn.token_usage.output, turn.duration_seconds)
+                            _safe_divide(prompt_input_tokens(turn) + turn.token_usage.output, turn.duration_seconds)
                             for turn in turns
                         ]
                     ),

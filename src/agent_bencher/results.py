@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
+from agent_bencher.metrics import prompt_input_tokens, total_prompt_input_tokens
 from agent_bencher.models import BatchResult, SessionResult, TurnResult
 from agent_bencher.report import build_batch_markdown_report, build_markdown_report
 
@@ -37,6 +38,7 @@ def _total_throughput_tps(*, input_tokens: int, output_tokens: int, duration_sec
 
 
 def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
+    input_tokens = prompt_input_tokens(turn)
     return {
         "run_id": run_id,
         "turn_index": turn_index,
@@ -47,14 +49,14 @@ def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
         "duration_seconds": turn.duration_seconds,
         "started_at": turn.started_at,
         "ended_at": turn.ended_at,
-        "input_tokens": turn.token_usage.input,
+        "input_tokens": input_tokens,
         "output_tokens": turn.token_usage.output,
         "output_tps": _output_tps(
             output_tokens=turn.token_usage.output,
             duration_seconds=turn.duration_seconds,
         ),
         "total_throughput_tps": _total_throughput_tps(
-            input_tokens=turn.token_usage.input,
+            input_tokens=input_tokens,
             output_tokens=turn.token_usage.output,
             duration_seconds=turn.duration_seconds,
         ),
@@ -68,7 +70,7 @@ def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
 
 
 def _serialize_run(session: SessionResult, *, conversation_path: str, transcript_dir: str) -> dict:
-    total_input_tokens = sum(turn.token_usage.input for turn in session.turns)
+    total_input_tokens = total_prompt_input_tokens(session)
     total_output_tokens = sum(turn.token_usage.output for turn in session.turns)
     total_reasoning_tokens = sum(turn.token_usage.reasoning for turn in session.turns)
     total_cache_read_tokens = sum(turn.token_usage.cache_read for turn in session.turns)

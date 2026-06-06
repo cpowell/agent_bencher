@@ -66,3 +66,40 @@ def test_build_batch_result_uses_zero_stddev_for_single_success() -> None:
 
     assert batch.run_metrics["duration_seconds"].stddev == 0.0
     assert batch.turn_metrics[0]["output_tokens"].stddev == 0.0
+
+
+def test_build_batch_result_counts_cached_prompt_tokens_in_input_metrics() -> None:
+    session = SessionResult(
+        run_id="r1",
+        conversation_name="sample",
+        agent_id="claude-cached",
+        frontend="claude",
+        backend_model="model-x",
+        session_id="session-r1",
+        started_at="2026-06-01T00:00:00Z",
+        ended_at="2026-06-01T00:00:10Z",
+        duration_seconds=10.0,
+        status="completed",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="session-r1",
+                exit_code=0,
+                duration_seconds=10.0,
+                stdout="{}",
+                stderr="",
+                token_usage=TokenUsage(input=0, output=40, cache_read=1000, cache_write=200),
+            )
+        ],
+        comment="",
+    )
+
+    batch = build_batch_result(batch_id="2026-06-01T12-00-00", requested_runs=1, comment="", sessions=[session])
+
+    assert batch.run_metrics["total_input_tokens"].mean == 1200.0
+    assert batch.turn_metrics[0]["input_tokens"].mean == 1200.0
+    assert batch.run_metrics["effective_total_throughput_tps"].mean == 124.0
+    assert batch.turn_metrics[0]["total_throughput_tps"].mean == 124.0

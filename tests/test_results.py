@@ -203,6 +203,50 @@ def test_write_results_extracts_human_readable_text_from_top_level_claude_result
     assert "_No human-readable assistant text extracted._" not in conversation
 
 
+def test_write_results_counts_cached_prompt_tokens_in_input_totals(tmp_path: Path) -> None:
+    session = SessionResult(
+        run_id="2026-06-05T23-12-14-trial-001",
+        conversation_name="sample-conversation",
+        agent_id="claude-qwen35-122B-mtp",
+        frontend="claude",
+        backend_model="Qwen3.5-122B-A10B-4bit",
+        session_id="claude-session-123",
+        started_at="2026-06-05T23:12:14Z",
+        ended_at="2026-06-05T23:12:40Z",
+        duration_seconds=10.0,
+        status="completed",
+        comment="",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Describe MVC",
+                session_id="claude-session-123",
+                exit_code=0,
+                duration_seconds=10.0,
+                stdout="{}",
+                stderr="",
+                token_usage=TokenUsage(input=0, output=40, cache_read=1000, cache_write=200),
+            )
+        ],
+    )
+
+    write_results(sessions=[session], output_dir=tmp_path)
+
+    run_payload = json.loads((tmp_path / "run.json").read_text())
+    turn_payload = json.loads((tmp_path / "turns.jsonl").read_text().strip())
+
+    assert run_payload["total_input_tokens"] == 1200
+    assert run_payload["total_cache_read_tokens"] == 1000
+    assert run_payload["total_cache_write_tokens"] == 200
+    assert run_payload["effective_total_throughput_tps"] == 124.0
+    assert turn_payload["input_tokens"] == 1200
+    assert turn_payload["cache_read_tokens"] == 1000
+    assert turn_payload["cache_write_tokens"] == 200
+    assert turn_payload["total_throughput_tps"] == 124.0
+
+
 def test_write_results_uses_zero_throughput_for_zero_duration(tmp_path: Path) -> None:
     session = SessionResult(
         run_id="2026-05-31T14-26-00",

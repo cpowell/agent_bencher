@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent_bencher.metrics import prompt_input_tokens, total_prompt_input_tokens
 from agent_bencher.models import BatchResult, SessionResult
 
 
@@ -13,7 +14,7 @@ def build_markdown_report(sessions: list[SessionResult]) -> str:
     lines = ["# Benchmark Summary", ""]
 
     for session in sessions:
-        total_input = sum(turn.token_usage.input for turn in session.turns)
+        total_input = total_prompt_input_tokens(session)
         total_output = sum(turn.token_usage.output for turn in session.turns)
         effective_output_tps = _safe_divide(total_output, session.duration_seconds)
         effective_total_throughput_tps = _safe_divide(total_input + total_output, session.duration_seconds)
@@ -44,14 +45,15 @@ def build_markdown_report(sessions: list[SessionResult]) -> str:
         )
 
         for turn_index, turn in enumerate(session.turns, start=1):
+            input_tokens = prompt_input_tokens(turn)
             output_tps = _safe_divide(turn.token_usage.output, turn.duration_seconds)
             total_throughput_tps = _safe_divide(
-                turn.token_usage.input + turn.token_usage.output,
+                input_tokens + turn.token_usage.output,
                 turn.duration_seconds,
             )
             lines.append(
                 f"| {turn_index} | {turn.prompt_id} | {turn.duration_seconds:.2f} | "
-                f"{turn.token_usage.input} | {turn.token_usage.output} | "
+                f"{input_tokens} | {turn.token_usage.output} | "
                 f"{output_tps:.2f} | {total_throughput_tps:.2f} | "
                 f"`{turn.stdout_path or 'transcripts/pending'}` | `{turn.stderr_path or 'transcripts/pending'}` |"
             )
