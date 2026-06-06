@@ -8,3 +8,4 @@ Rules:
 - Use plain `Read` only for short files or final spot checks.
 
 When asked to write a commit message, invoke the conventional-commit skill first.
+Always display commit messages in a fenced markdown code block.
