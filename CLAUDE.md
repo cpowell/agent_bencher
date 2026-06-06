@@ -6,3 +6,5 @@ Rules:
 - Prefer `ctx_fetch_and_index` for external docs/pages, then `ctx_search`.
   - **Never use `WebFetch`** — it redirects to `ctx_fetch_and_index`. Always call `ctx_fetch_and_index` directly for web content.
 - Use plain `Read` only for short files or final spot checks.
+
+When asked to write a commit message, invoke the conventional-commit skill first.
