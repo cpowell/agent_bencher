@@ -1,0 +1,19 @@
+id: claude-qwen3.6-35B-A3B-oQ6-fp16-mtp
+frontend: claude
+model: Qwen3.6-35B-A3B-oQ6-fp16-mtp
+args:
+  - --output-format
+  - json
+  - --permission-mode
+  - bypassPermissions
+  - --model
+  - sonnet
+  - --tools
+  - "Bash,Read,Edit,Write,Glob,Grep,WebSearch,WebFetch,Skill,Agent"  
+env:
+  ANTHROPIC_BASE_URL: http://127.0.0.1:8000
+  ANTHROPIC_DEFAULT_OPUS_MODEL: Qwen3.6-35B-A3B-oQ6-fp16-mtp
+  ANTHROPIC_DEFAULT_SONNET_MODEL: Qwen3.6-35B-A3B-oQ6-fp16-mtp
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: Qwen3.6-35B-A3B-oQ6-fp16-mtp
+  API_TIMEOUT_MS: "3000000"
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
