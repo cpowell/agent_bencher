@@ -1,8 +1,6 @@
 # agent-bencher
 
-- Speed-benchmark real agent frontends against local models over continuing multi-turn conversations. 
-- Test and tune your server and model settings for the best possible LLM performance.
-- Skip synthetic tests and see how **your** model, agent and server settings execute using **your** style of prompting.
+Benchmark real agent frontends against local models over multi-turn conversations. Compare server, model, and agent settings using your own prompts rather than synthetic microbenchmarks.
 
 `agent-bencher` replays a conversation sequentially, prompt-by-prompt, against a real agent CLI, measures each turn, and writes artifacts you can inspect later. It currently supports:
 
@@ -13,7 +11,7 @@
 - Human-readable conversation transcripts plus raw stdout/stderr capture
 - Visualizations generated from the latest batch for each agent config
 
-You'll receive statistics like this extract:
+Example extracted from one `summary.md`:
 
 > ## Run-Level Aggregates
 >
@@ -42,7 +40,7 @@ uv sync
 uv run python -m agent_bencher --help
 ```
 
-## How to actually use the tool
+## Typical workflow (quick-ish start)
 
 1. Define your own conversation (or just start with the sample conversation).
 1. Set up a server like LM Studio, oMLX with a model, context size, etc.
@@ -50,21 +48,23 @@ uv run python -m agent_bencher --help
 1. Configure your frontend config file. (See below for details on these files.)
     - `~/.config/opencode/opencode.json`
     - `~/.claude/settings.json`
-1. Run the tool, for example: 
-    `uv run python -m agent_bencher bench ./run_configs/claude-qwen3.6-35B-A3B-oQ6-fp16-mtp.yaml ./conversations/sample-conversation.yaml --runs 3 --comment "MTP enabled, 132K context"`
+1. Run a benchmark: 
+    ```
+    uv run python -m agent_bencher bench ./run_configs/claude-qwen3.6-35B-A3B-oQ6-fp16-mtp.yaml ./conversations/sample-conversation.yaml --runs 3 --comment "MTP enabled, 132K context"
+    ```
 1. Watch the progress bar:
     ```
     Run started at 2026-06-08T20:29:14Z
     prompt 3/7: Inspect this repository and tell me, in 3...:  29%|█████▍             | 2/7 [00:32<01:26, 17.28s/prompt]
     ```
-1. At the conclusion of your run, find your statistics `summary.md` under `runs/[your conversation name]/[your run config]`.
+1. At the conclusion of your run, find your statistics `summary.md` under `runs/[your conversation name]/[your run config]/[batch ID]`.
 
-## Important frontend configuration information (don't skip this!)
-The tool just executes the frontends via their exposed command line interfaces. But these frontends all configure things slightly differently; there are specifics to be mindful of.
+## Framework specific configuration
+`agent-bencher` invokes the real CLI, so endpoint and model wiring still live in the frontend’s own config. Specifics:
 
 ### Claude Code
 - In the run configuration YAML file set `args` and `env` for your system.
-- Note how all three model definitions point to the same model (the one under test). This is because Claude likes to invoke the Haiku model for its own purposes sometimes; standardizing this way ensures that Claude Code will only invoke the model under test no matter what.
+- Note how all three model definitions point to the same model (the one under test). Claude Code may invoke alternate model roles internally, so these configs pin all three Anthropic default model vars to the model under test.
 - Note this command line parameter:
     ```
       - --tools
@@ -79,10 +79,7 @@ The tool just executes the frontends via their exposed command line interfaces. 
         "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
         "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
         "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "132768",
-        "CLAUDE_CODE_DISABLE_ERROR_REPORTING": "1",
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
-        "CLAUDE_CODE_DISABLE_TELEMETRY": "1",
         "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
         "CLAUDE_CODE_GLOB_TIMEOUT_SECONDS": "60",
         "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "32000",
@@ -92,7 +89,7 @@ The tool just executes the frontends via their exposed command line interfaces. 
       },
     ```
 
-    If you're running Claude Code against local models these env vars will go a long way to making the experience smooth for you. You can consult https://code.claude.com/docs/en/env-vars for detailed explanations. Unsetting `CLAUDE_CODE_ATTRIBUTION_HEADER` is documented in `https://unsloth.ai/docs/basics/claude-code` as a big aid to local inference speed.
+    If you're running Claude Code against local models these env vars will go a long way to making the experience smooth for you. You can consult https://code.claude.com/docs/en/env-vars for detailed explanations. Unsetting `CLAUDE_CODE_ATTRIBUTION_HEADER` is documented in https://unsloth.ai/docs/basics/claude-code as a big aid to local inference speed.
 
 ### OpenCode
 - `args` and `env` in the run config YAML file are not as important as for Claude Code.
@@ -123,9 +120,10 @@ The tool just executes the frontends via their exposed command line interfaces. 
             "output": 16384
           }
         },
+        [snip]
     ```
 
-## Miscellaneous notes
+## Reference
 ### Repository Layout
 
 - `conversations/`: benchmark conversations to replay
@@ -184,43 +182,7 @@ For each trial, the harness:
 
 Successful trial workspaces are deleted after completion. Failed or partial trial workspaces are left on disk for inspection.
 
-### Usage
-
-Run one conversation against one config:
-
-```bash
-uv run python -m agent_bencher bench \
-  run_configs/opencode-mtplx-qwen36-27b.yaml \
-  conversations/sample-conversation.yaml
-```
-
-Run repeated trials and attach a note:
-
-```bash
-uv run python -m agent_bencher bench \
-  run_configs/claude-qwen36-27b.yaml \
-  conversations/sample-conversation.yaml \
-  --runs 5 \
-  --comment "local comparison after prompt edits"
-```
-
-Write artifacts somewhere other than `runs/`:
-
-```bash
-uv run python -m agent_bencher bench \
-  run_configs/claude-qwen36-27b.yaml \
-  conversations/sample-conversation.yaml \
-  --output-dir /tmp/agent-bencher-runs
-```
-
-Generate charts from a conversation directory:
-
-```bash
-uv run python -m agent_bencher viz \
-  runs/sample-conversation
-```
-
-### CLI
+### CLI Reference
 
 #### `bench`
 
@@ -298,6 +260,8 @@ Input token totals include cache read and cache write tokens.
 Batch summaries aggregate successful trials only, with mean/min/max/stddev for run-level and per-turn metrics.
 
 ## Frontend Adapters
+
+These are the actual command shapes the harness uses:
 
 ### Claude
 
