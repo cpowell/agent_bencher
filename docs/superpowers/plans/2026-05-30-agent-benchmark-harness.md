@@ -515,7 +515,7 @@ def test_claude_start_command_keeps_env_and_model_flag(tmp_path: Path) -> None:
         args=["--output-format", "json", "--permission-mode", "bypassPermissions", "--model", "opus"],
         env={
             "ANTHROPIC_BASE_URL": "http://127.0.0.1:8000",
-            "ANTHROPIC_AUTH_TOKEN": "cbp8",
+            "ANTHROPIC_AUTH_TOKEN": "blah",
             "ANTHROPIC_DEFAULT_OPUS_MODEL": "Qwen3.6-27B-4bit",
         },
     )
