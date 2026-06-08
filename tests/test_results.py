@@ -3,7 +3,17 @@ import json
 
 from agent_bencher.batch import build_batch_result
 from agent_bencher.models import SessionResult, TokenUsage, TurnResult
-from agent_bencher.results import write_batch_results, write_results
+from agent_bencher.results import (
+    _extract_assistant_text_from_payload,
+    _extract_human_readable_stdout,
+    _extract_response_started_at,
+    _extract_text_blocks,
+    _format_t_plus,
+    _format_wall_clock,
+    _parse_iso_timestamp,
+    write_batch_results,
+    write_results,
+)
 
 
 def test_write_results_emits_compact_run_json_and_turns_jsonl(tmp_path: Path) -> None:
@@ -326,3 +336,189 @@ def test_write_batch_results_uses_batch_first_layout(tmp_path: Path) -> None:
     assert (tmp_path / "summary.md").exists()
     assert (tmp_path / "trials" / "trial-001" / "run.json").exists()
     assert (tmp_path / "trials" / "trial-001" / "turns.jsonl").exists()
+
+
+# -- _extract_text_blocks --
+
+
+def test_extract_text_blocks_returns_string_as_list() -> None:
+    assert _extract_text_blocks("hello") == ["hello"]
+
+
+def test_extract_text_blocks_returns_empty_for_non_list_non_string() -> None:
+    assert _extract_text_blocks(42) == []
+    assert _extract_text_blocks(None) == []
+    assert _extract_text_blocks({"key": "val"}) == []
+
+
+def test_extract_text_blocks_extracts_plain_strings_from_list() -> None:
+    assert _extract_text_blocks(["first", "second"]) == ["first", "second"]
+
+
+def test_extract_text_blocks_skips_non_dict_non_string_items() -> None:
+    assert _extract_text_blocks([42, "kept", None]) == ["kept"]
+
+
+def test_extract_text_blocks_extracts_from_content_key() -> None:
+    result = _extract_text_blocks([{"content": "from-content"}])
+    assert result == ["from-content"]
+
+
+def test_extract_text_blocks_combines_text_type_and_plain_strings() -> None:
+    result = _extract_text_blocks(
+        [
+            "plain string",
+            {"type": "text", "text": "typed text"},
+            {"content": "content field"},
+        ]
+    )
+    assert result == ["plain string", "typed text", "content field"]
+
+
+# -- _extract_assistant_text_from_payload --
+
+
+def test_extract_assistant_text_from_result_dict_keys() -> None:
+    payload = {"result": {"text": "result-text", "message": "result-msg"}}
+    result = _extract_assistant_text_from_payload(payload)
+    assert "result-text" in result
+    assert "result-msg" in result
+
+
+def test_extract_assistant_text_from_result_dict_content_key() -> None:
+    payload = {"result": {"content": "result-content"}}
+    result = _extract_assistant_text_from_payload(payload)
+    assert "result-content" in result
+
+
+def test_extract_assistant_text_from_text_type_with_part() -> None:
+    payload = {"type": "text", "part": {"text": "part-text"}}
+    result = _extract_assistant_text_from_payload(payload)
+    assert result == ["part-text"]
+
+
+def test_extract_assistant_text_from_assistant_type_with_message() -> None:
+    payload = {
+        "type": "assistant",
+        "message": {"content": [{"type": "text", "text": "msg-text"}]},
+    }
+    result = _extract_assistant_text_from_payload(payload)
+    assert result == ["msg-text"]
+
+
+def test_extract_assistant_text_returns_empty_for_unknown_shape() -> None:
+    assert _extract_assistant_text_from_payload({"unknown": "data"}) == []
+
+
+# -- _extract_human_readable_stdout --
+
+
+def test_extract_human_readable_stdout_empty_returns_empty() -> None:
+    assert _extract_human_readable_stdout("") == ""
+    assert _extract_human_readable_stdout("   ") == ""
+
+
+def test_extract_human_readable_stdout_falls_back_plain_when_no_json_dicts() -> None:
+    stdout = "123\n456\n"
+    assert _extract_human_readable_stdout(stdout) == stdout.strip()
+
+
+def test_extract_human_readable_stdout_skips_blank_lines_in_jsonl() -> None:
+    stdout = '{"type":"text","part":{"text":"a"}}\n\n{"type":"text","part":{"text":"b"}}'
+    result = _extract_human_readable_stdout(stdout)
+    assert "a" in result
+    assert "b" in result
+
+
+# -- _parse_iso_timestamp and _format helpers --
+
+
+def test_parse_iso_timestamp_returns_none_for_invalid() -> None:
+    assert _parse_iso_timestamp("") is None
+    assert _parse_iso_timestamp("not-a-date") is None
+
+
+def test_format_wall_clock_handles_invalid_timestamp() -> None:
+    assert _format_wall_clock("") == "unknown"
+    assert _format_wall_clock("bad") == "bad"
+
+
+def test_format_t_plus_returns_unknown_for_invalid_timestamps() -> None:
+    assert _format_t_plus(reference="bad", value="2026-01-01T00:00:00Z") == "unknown"
+    assert _format_t_plus(reference="2026-01-01T00:00:00Z", value="bad") == "unknown"
+
+
+# -- _extract_response_started_at --
+
+
+def test_extract_response_started_at_empty_stdout() -> None:
+    assert _extract_response_started_at("") == ""
+    assert _extract_response_started_at("   ") == ""
+
+
+def test_extract_response_started_at_from_list_payload_string_timestamp() -> None:
+    stdout = json.dumps(
+        [
+            {"type": "system"},
+            {"type": "assistant", "timestamp": "2026-06-01T00:00:05Z"},
+        ]
+    )
+    assert _extract_response_started_at(stdout) == "2026-06-01T00:00:05Z"
+
+
+def test_extract_response_started_at_from_jsonl_string_timestamp() -> None:
+    stdout = '{"type":"text","timestamp":"2026-06-01T00:00:05Z"}'
+    assert _extract_response_started_at(stdout) == "2026-06-01T00:00:05Z"
+
+
+def test_extract_response_started_at_from_jsonl_numeric_timestamp() -> None:
+    stdout = '{"type":"text","timestamp":1780237823600}'
+    result = _extract_response_started_at(stdout)
+    assert result  # should produce an ISO string
+    assert "T" in result
+
+
+def test_extract_response_started_at_skips_blank_lines_in_jsonl() -> None:
+    stdout = '\n{"type":"text","timestamp":"2026-06-01T00:00:05Z"}\n'
+    assert _extract_response_started_at(stdout) == "2026-06-01T00:00:05Z"
+
+
+# -- Integration: stderr section in conversation.md --
+
+
+def test_write_results_includes_stderr_section_in_conversation(tmp_path: Path) -> None:
+    session = SessionResult(
+        run_id="run-1",
+        conversation_name="sample",
+        agent_id="agent-1",
+        frontend="opencode",
+        backend_model="model-1",
+        session_id="session-1",
+        started_at="2026-01-01T00:00:00Z",
+        ended_at="2026-01-01T00:00:01Z",
+        duration_seconds=1.0,
+        status="completed",
+        comment="",
+        prompts_attempted=1,
+        prompts_completed=1,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="session-1",
+                exit_code=0,
+                duration_seconds=1.0,
+                started_at="2026-01-01T00:00:00Z",
+                ended_at="2026-01-01T00:00:01Z",
+                stdout='{"type":"text","part":{"text":"OK"}}',
+                stderr="warning: something happened",
+                token_usage=TokenUsage(input=10, output=5),
+            )
+        ],
+    )
+
+    write_results(sessions=[session], output_dir=tmp_path)
+
+    conversation = (tmp_path / "conversation.md").read_text()
+    assert "### Stderr" in conversation
+    assert "warning: something happened" in conversation

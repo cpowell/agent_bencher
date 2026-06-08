@@ -23,3 +23,8 @@ agent-bencher = "agent_bencher.cli:main"
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]
