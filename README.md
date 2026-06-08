@@ -11,7 +11,7 @@ Benchmark real agent frontends against local models over multi-turn conversation
 - Human-readable conversation transcripts plus raw stdout/stderr capture
 - Visualizations generated from the latest batch for each agent config
 
-Example extracted from one `summary.md`:
+Example extracted from a `summary.md`:
 
 > ## Run-Level Aggregates
 >
@@ -55,7 +55,7 @@ uv run python -m agent_bencher --help
 1. Watch the progress bar:
     ```
     Run started at 2026-06-08T20:29:14Z
-    prompt 3/7: Inspect this repository and tell me, in 3...:  29%|█████▍             | 2/7 [00:32<01:26, 17.28s/prompt]
+    prompt 3/7: Inspect this repository...:  29%|█████▍             | 2/7 [00:32<01:26, 17.28s/prompt]
     ```
 1. At the conclusion of your run, find your statistics `summary.md` under `runs/[your conversation name]/[your run config]/[batch ID]`.
 
@@ -73,7 +73,7 @@ uv run python -m agent_bencher --help
     This is important because it drastically reduces tool context usage by excluding tools you won't use locally.
 - Your `~/.claude/settings.json` *is* read automatically and *does* need to match your server settings such as the context length. (Context length is set by `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.) Here is a reasonable `env` section you might like to use as a starting point:
 
-    ```
+    ```json
       "env": {
         "API_TIMEOUT_MS": "3000000",
         "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
@@ -94,7 +94,7 @@ uv run python -m agent_bencher --help
 ### OpenCode
 - `args` and `env` in the run config YAML file are not as important as for Claude Code.
 - However your `~/.config/opencode/opencode.json` is critical. This is where you must predefine your provider, model, context length. A model stanza might look like this:
-    ```
+    ```json
     "omlx": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "oMLX",
