@@ -12,6 +12,7 @@ from agent_bencher.process import run_command
 from agent_bencher.results import write_batch_results
 from agent_bencher.runner import run_conversation
 from agent_bencher.suite import load_agent_config, load_conversation
+from agent_bencher.viz import generate_bar_chart, load_agent_runs
 from agent_bencher.workspace import prepare_variant_workspace
 
 
@@ -82,16 +83,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of repeated trials to execute. Default: 1",
     )
 
+    viz_parser = subparsers.add_parser(
+        "viz",
+        help="Generate speed comparison charts from run artifacts.",
+        description="Read batch runs from a conversation directory and generate matplotlib bar charts.",
+    )
+    viz_parser.add_argument(
+        "conversation_dir",
+        type=Path,
+        help="Path to a conversation directory under runs/ (e.g., runs/sample-conversation).",
+    )
+    viz_parser.set_defaults(func=viz)
+
+    bench.set_defaults(func=bench_cmd)
+
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-
-    if args.command != "bench":
-        parser.error(f"unsupported command: {args.command}")
-
+def bench_cmd(args: argparse.Namespace) -> int:
+    """Run one conversation against one run config."""
     conversation = load_conversation(args.conversation)
     agent = load_agent_config(args.run_config)
     now = datetime.now(timezone.utc)
@@ -160,3 +170,39 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
     return 130 if interrupted else 0
+
+
+def viz(args: argparse.Namespace) -> int:
+    """Generate speed comparison charts from run artifacts."""
+    conversation_dir = args.conversation_dir
+    if not conversation_dir.is_absolute():
+        conversation_dir = Path.cwd() / conversation_dir
+
+    agents = load_agent_runs(conversation_dir)
+
+    viz_dir = conversation_dir / "viz"
+    viz_dir.mkdir(exist_ok=True)
+
+    metrics = [
+        ("duration_seconds", "duration.png"),
+        ("effective_output_tps", "output_tps.png"),
+        ("effective_total_throughput_tps", "total_throughput_tps.png"),
+    ]
+
+    for metric_key, filename in metrics:
+        output_path = viz_dir / filename
+        generate_bar_chart(agents, metric_key, output_path)
+        print(f"Generated: {output_path}", file=sys.stderr)
+
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if not hasattr(args, "func"):
+        parser.print_help()
+        return 0
+
+    return args.func(args)
