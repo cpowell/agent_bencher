@@ -7,3 +7,4 @@ prompts:
   - text: "Now summarize the current architecture in 2 short paragraphs, focusing on how a benchmark suite gets executed."
   - text: "Finally, can you suggest 3 improvements to the current architecture that would make it more efficient or easier to use?"
   - text: "For each of the 3 improvements you suggested, can you provide a brief implementation plan outlining the steps needed to achieve it?"
+  - text: "Run the tests in this repository and report test coverage metrics."
