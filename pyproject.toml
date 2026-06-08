@@ -9,6 +9,7 @@ description = "Benchmark real agent frontends over continuing conversations."
 requires-python = ">=3.12"
 dependencies = [
   "PyYAML>=6.0,<7.0",
+  "matplotlib>=3.8",
   "tqdm>=4.66,<5.0",
 ]
 
