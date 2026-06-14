@@ -1,0 +1,7 @@
+id: opencode-lmstudio-qwen36-27b-q5_k_xl-mtp
+frontend: opencode
+model: lmstudio/qwen3.6-27b-mtp
+args:
+  - --format
+  - json
+env: {}
