@@ -33,7 +33,7 @@ def load_agent_runs(
     exclude_slowest: bool = False,
     only_slowest: bool = False,
 ) -> dict[str, dict[str, list[float]]]:
-    """Load speed metrics from the latest batch of each agent config.
+    """Load speed metrics from all batches of each agent config.
 
     Returns a dict mapping agent_id to a dict of metric_name -> list of trial values.
     """
@@ -63,53 +63,52 @@ def load_agent_runs(
             print(f"Warning: no batch runs in '{agent_dir}'", file=sys.stderr)
             continue
 
-        latest_batch = batch_runs[-1]
-        batch_json = latest_batch / "batch.json"
-
-        if not batch_json.exists():
-            print(f"Warning: no batch.json in '{latest_batch}'", file=sys.stderr)
-            continue
-
-        trials_dir = latest_batch / "trials"
-        if not trials_dir.is_dir():
-            print(f"Warning: no trials dir in '{latest_batch}'", file=sys.stderr)
-            continue
-
-        trial_dirs = sorted(d for d in trials_dir.iterdir() if d.is_dir())
-        if not trial_dirs:
-            print(f"Warning: no trials in '{latest_batch}'", file=sys.stderr)
-            continue
-
-        # Read batch.json for agent_id
-        with open(batch_json) as f:
-            batch_data = json.load(f)
-
-        agent_id = batch_data.get("agent_id", agent_dir.name)
-
+        agent_id = agent_dir.name
         trial_rows: list[dict[str, float]] = []
 
-        for trial_dir in trial_dirs:
-            run_json = trial_dir / "run.json"
-            if not run_json.exists():
+        for batch_dir in batch_runs:
+            batch_json = batch_dir / "batch.json"
+            if not batch_json.exists():
+                print(f"Warning: no batch.json in '{batch_dir}'", file=sys.stderr)
                 continue
 
-            with open(run_json) as f:
-                run_data = json.load(f)
+            with open(batch_json) as f:
+                batch_data = json.load(f)
 
-            row: dict[str, float] = {}
-            for metric_name, path in metric_paths.items():
-                value = run_data
-                for key in path:
-                    if isinstance(value, dict):
-                        value = value.get(key)
-                    else:
-                        value = None
-                        break
-                if value is not None and isinstance(value, (int, float)):
-                    row[metric_name] = float(value)
+            agent_id = batch_data.get("agent_id", agent_id)
 
-            if row.get("duration_seconds") is not None:
-                trial_rows.append(row)
+            trials_dir = batch_dir / "trials"
+            if not trials_dir.is_dir():
+                print(f"Warning: no trials dir in '{batch_dir}'", file=sys.stderr)
+                continue
+
+            trial_dirs = sorted(d for d in trials_dir.iterdir() if d.is_dir())
+            if not trial_dirs:
+                print(f"Warning: no trials in '{batch_dir}'", file=sys.stderr)
+                continue
+
+            for trial_dir in trial_dirs:
+                run_json = trial_dir / "run.json"
+                if not run_json.exists():
+                    continue
+
+                with open(run_json) as f:
+                    run_data = json.load(f)
+
+                row: dict[str, float] = {}
+                for metric_name, path in metric_paths.items():
+                    value = run_data
+                    for key in path:
+                        if isinstance(value, dict):
+                            value = value.get(key)
+                        else:
+                            value = None
+                            break
+                    if value is not None and isinstance(value, (int, float)):
+                        row[metric_name] = float(value)
+
+                if row.get("duration_seconds") is not None:
+                    trial_rows.append(row)
 
         filtered_rows = _filter_trial_rows(
             trial_rows=trial_rows,

@@ -114,12 +114,12 @@ def build_parser() -> argparse.ArgumentParser:
     viz_filter_group.add_argument(
         "--exclude-slowest",
         action="store_true",
-        help="Exclude the slowest trial from each agent's latest batch before plotting.",
+        help="Exclude the slowest trial from each agent's combined batches before plotting.",
     )
     viz_filter_group.add_argument(
         "--only-slowest",
         action="store_true",
-        help="Plot only the slowest trial from each agent's latest batch.",
+        help="Plot only the slowest trial from each agent's combined batches.",
     )
     viz_parser.set_defaults(func=viz)
 

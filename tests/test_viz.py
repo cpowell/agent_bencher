@@ -64,22 +64,22 @@ class TestLoadAgentRuns:
         assert len(result["agent-a"]["duration_seconds"]) == 2
         assert len(result["agent-b"]["duration_seconds"]) == 2
 
-    def test_selects_latest_batch(self, tmp_path: Path) -> None:
+    def test_combines_trials_across_all_batches(self, tmp_path: Path) -> None:
         conv_dir = tmp_path / "test-conv"
 
-        # Older batch (should be ignored)
         old = conv_dir / "agent-x" / "batch-1" / "trials" / "trial-001"
         _write_run_json(old, duration=500.0, output_tps=5.0, total_tps=500.0)
         _write_batch_json(conv_dir / "agent-x" / "batch-1", "agent-x")
 
-        # Newer batch (should be used)
         new = conv_dir / "agent-x" / "batch-2" / "trials" / "trial-001"
         _write_run_json(new, duration=100.0, output_tps=20.0, total_tps=1000.0)
         _write_batch_json(conv_dir / "agent-x" / "batch-2", "agent-x")
 
         result = load_agent_runs(conv_dir)
 
-        assert result["agent-x"]["duration_seconds"] == [100.0]
+        assert result["agent-x"]["duration_seconds"] == [500.0, 100.0]
+        assert result["agent-x"]["effective_output_tps"] == [5.0, 20.0]
+        assert result["agent-x"]["effective_total_throughput_tps"] == [500.0, 1000.0]
 
     def test_excludes_viz_directory(self, tmp_path: Path) -> None:
         conv_dir = tmp_path / "test-conv"
@@ -123,6 +123,25 @@ class TestLoadAgentRuns:
         assert result["agent-a"]["duration_seconds"] == [140.0]
         assert result["agent-a"]["effective_output_tps"] == [15.0]
         assert result["agent-a"]["effective_total_throughput_tps"] == [900.0]
+
+    def test_slowest_filters_apply_across_combined_batches(self, tmp_path: Path) -> None:
+        conv_dir = tmp_path / "test-conv"
+
+        batch_1 = conv_dir / "agent-a" / "batch-1" / "trials"
+        _write_run_json(batch_1 / "trial-001", duration=100.0, output_tps=20.0, total_tps=1000.0)
+        _write_run_json(batch_1 / "trial-002", duration=130.0, output_tps=18.0, total_tps=950.0)
+        _write_batch_json(conv_dir / "agent-a" / "batch-1", "agent-a")
+
+        batch_2 = conv_dir / "agent-a" / "batch-2" / "trials"
+        _write_run_json(batch_2 / "trial-001", duration=140.0, output_tps=15.0, total_tps=900.0)
+        _write_run_json(batch_2 / "trial-002", duration=110.0, output_tps=22.0, total_tps=1050.0)
+        _write_batch_json(conv_dir / "agent-a" / "batch-2", "agent-a")
+
+        excluded = load_agent_runs(conv_dir, exclude_slowest=True)
+        slowest_only = load_agent_runs(conv_dir, only_slowest=True)
+
+        assert excluded["agent-a"]["duration_seconds"] == [100.0, 130.0, 110.0]
+        assert slowest_only["agent-a"]["duration_seconds"] == [140.0]
 
     def test_error_on_nonexistent_directory(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit):

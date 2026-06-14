@@ -9,7 +9,7 @@ Benchmark real agent frontends against local models over multi-turn conversation
 - Repeated trials with batch-level aggregates
 - Per-turn token and throughput metrics
 - Human-readable conversation transcripts plus raw stdout/stderr capture
-- Visualizations generated from the latest batch for each agent config
+- Visualizations generated from all batches found for each agent config
 
 Example extracted from a `summary.md`:
 
@@ -202,7 +202,7 @@ Options:
 python -m agent_bencher viz <conversation-dir>
 ```
 
-This command reads the latest batch directory for each agent under the conversation directory and writes PNG charts to `<conversation-dir>/viz/`.
+This command reads all batch directories for each agent under the conversation directory and writes PNG charts to `<conversation-dir>/viz/`.
 
 Charts currently generated:
 
@@ -280,5 +280,5 @@ These are the actual command shapes the harness uses:
 ## Notes
 
 - The harness checkpoints completed turns during a run into the per-trial workspace `artifacts/` directory, and also writes accumulated batch results after each finished trial.
-- `viz` ignores the `viz/` directory itself and compares the latest batch found for each agent config.
+- `viz` ignores the `viz/` directory itself and compares all batch runs found for each agent config.
 - Progress is shown on stderr when the process is attached to a TTY.
