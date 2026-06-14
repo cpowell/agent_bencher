@@ -3,8 +3,7 @@ source_workspace: ..
 prompts:
   - text: "Describe the MVC Pattern in software engineering."
   - text: "Describe MCP as it applies to AI agents."
+  - text: "Create a single HTML file with an interactive cloth simulator. The cloth should hang naturally, move with realistic weight, and let me click, drag, pull, and whip it around the screen with my mouse."
   - text: "Inspect this repository and tell me, in 3 concise bullets, what the benchmark harness currently does."
   - text: "Now summarize the current architecture in 2 short paragraphs, focusing on how a benchmark suite gets executed."
-  - text: "Finally, can you suggest 3 improvements to the current architecture that would make it more efficient or easier to use?"
-  - text: "For each of the 3 improvements you suggested, can you provide a brief implementation plan outlining the steps needed to achieve it?"
   - text: "Run the tests in this repository and report test coverage metrics."
