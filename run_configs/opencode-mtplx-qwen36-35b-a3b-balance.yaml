@@ -1,0 +1,7 @@
+id: opencode-mtplx-qwen36-35b-a3b-balance
+frontend: opencode
+model: mtplx/mtplx-qwen36-35b-a3b-optimized-balance
+args:
+  - --format
+  - json
+env: {}

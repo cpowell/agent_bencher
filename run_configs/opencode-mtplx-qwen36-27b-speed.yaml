@@ -1,4 +1,4 @@
-id: opencode-mtplx-qwen36-27b
+id: opencode-mtplx-qwen36-27b-speed
 frontend: opencode
 model: mtplx/mtplx-qwen36-27b-optimized-speed
 args:
