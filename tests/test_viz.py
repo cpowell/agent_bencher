@@ -94,6 +94,36 @@ class TestLoadAgentRuns:
         result = load_agent_runs(conv_dir)
         assert "viz" not in result
 
+    def test_exclude_slowest_omits_longest_duration_trial_per_agent(self, tmp_path: Path) -> None:
+        conv_dir = tmp_path / "test-conv"
+
+        agent = conv_dir / "agent-a" / "batch-1" / "trials"
+        _write_run_json(agent / "trial-001", duration=100.0, output_tps=20.0, total_tps=1000.0)
+        _write_run_json(agent / "trial-002", duration=140.0, output_tps=15.0, total_tps=900.0)
+        _write_run_json(agent / "trial-003", duration=110.0, output_tps=22.0, total_tps=1050.0)
+        _write_batch_json(conv_dir / "agent-a" / "batch-1", "agent-a")
+
+        result = load_agent_runs(conv_dir, exclude_slowest=True)
+
+        assert result["agent-a"]["duration_seconds"] == [100.0, 110.0]
+        assert result["agent-a"]["effective_output_tps"] == [20.0, 22.0]
+        assert result["agent-a"]["effective_total_throughput_tps"] == [1000.0, 1050.0]
+
+    def test_only_slowest_keeps_only_longest_duration_trial_per_agent(self, tmp_path: Path) -> None:
+        conv_dir = tmp_path / "test-conv"
+
+        agent = conv_dir / "agent-a" / "batch-1" / "trials"
+        _write_run_json(agent / "trial-001", duration=100.0, output_tps=20.0, total_tps=1000.0)
+        _write_run_json(agent / "trial-002", duration=140.0, output_tps=15.0, total_tps=900.0)
+        _write_run_json(agent / "trial-003", duration=110.0, output_tps=22.0, total_tps=1050.0)
+        _write_batch_json(conv_dir / "agent-a" / "batch-1", "agent-a")
+
+        result = load_agent_runs(conv_dir, only_slowest=True)
+
+        assert result["agent-a"]["duration_seconds"] == [140.0]
+        assert result["agent-a"]["effective_output_tps"] == [15.0]
+        assert result["agent-a"]["effective_total_throughput_tps"] == [900.0]
+
     def test_error_on_nonexistent_directory(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit):
             load_agent_runs(tmp_path / "nonexistent")
@@ -202,6 +232,14 @@ class TestGenerateBarChart:
 
 
 class TestVizCLI:
+    def test_viz_parser_rejects_both_slowest_flags(self) -> None:
+        from agent_bencher.cli import build_parser
+
+        parser = build_parser()
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(["viz", "runs/sample-conversation", "--exclude-slowest", "--only-slowest"])
+
     def test_viz_command_generates_files(self, tmp_path: Path) -> None:
         from agent_bencher.cli import build_parser
 
@@ -230,3 +268,71 @@ class TestVizCLI:
         assert (viz_dir / "duration.png").exists()
         assert (viz_dir / "output_tps.png").exists()
         assert (viz_dir / "total_throughput_tps.png").exists()
+
+    def test_viz_command_passes_exclude_slowest_flag_to_loader(self, tmp_path: Path, monkeypatch) -> None:
+        from agent_bencher.cli import build_parser, viz
+
+        captured: dict[str, object] = {}
+
+        def fake_load_agent_runs(conversation_dir: Path, *, exclude_slowest: bool = False, only_slowest: bool = False):
+            captured["conversation_dir"] = conversation_dir
+            captured["exclude_slowest"] = exclude_slowest
+            captured["only_slowest"] = only_slowest
+            return {
+                "agent-a": {
+                    "duration_seconds": [100.0],
+                    "effective_output_tps": [20.0],
+                    "effective_total_throughput_tps": [1000.0],
+                }
+            }
+
+        monkeypatch.setattr("agent_bencher.cli.load_agent_runs", fake_load_agent_runs)
+        monkeypatch.setattr("agent_bencher.cli.generate_bar_chart", lambda agents, metric_key, output_path: output_path.write_text(metric_key))
+
+        conv_dir = tmp_path / "test-conv"
+        conv_dir.mkdir()
+        parser = build_parser()
+        args = parser.parse_args(["viz", str(conv_dir), "--exclude-slowest"])
+
+        result = viz(args)
+
+        assert result == 0
+        assert captured == {
+            "conversation_dir": conv_dir,
+            "exclude_slowest": True,
+            "only_slowest": False,
+        }
+
+    def test_viz_command_passes_only_slowest_flag_to_loader(self, tmp_path: Path, monkeypatch) -> None:
+        from agent_bencher.cli import build_parser, viz
+
+        captured: dict[str, object] = {}
+
+        def fake_load_agent_runs(conversation_dir: Path, *, exclude_slowest: bool = False, only_slowest: bool = False):
+            captured["conversation_dir"] = conversation_dir
+            captured["exclude_slowest"] = exclude_slowest
+            captured["only_slowest"] = only_slowest
+            return {
+                "agent-a": {
+                    "duration_seconds": [140.0],
+                    "effective_output_tps": [15.0],
+                    "effective_total_throughput_tps": [900.0],
+                }
+            }
+
+        monkeypatch.setattr("agent_bencher.cli.load_agent_runs", fake_load_agent_runs)
+        monkeypatch.setattr("agent_bencher.cli.generate_bar_chart", lambda agents, metric_key, output_path: output_path.write_text(metric_key))
+
+        conv_dir = tmp_path / "test-conv"
+        conv_dir.mkdir()
+        parser = build_parser()
+        args = parser.parse_args(["viz", str(conv_dir), "--only-slowest"])
+
+        result = viz(args)
+
+        assert result == 0
+        assert captured == {
+            "conversation_dir": conv_dir,
+            "exclude_slowest": False,
+            "only_slowest": True,
+        }

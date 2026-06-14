@@ -7,7 +7,32 @@ from statistics import mean, stdev
 from typing import NamedTuple
 
 
-def load_agent_runs(conversation_dir: Path) -> dict[str, dict[str, list[float]]]:
+def _filter_trial_rows(
+    *,
+    trial_rows: list[dict[str, float]],
+    exclude_slowest: bool,
+    only_slowest: bool,
+) -> list[dict[str, float]]:
+    if not trial_rows or (not exclude_slowest and not only_slowest):
+        return trial_rows
+
+    slowest_index = max(
+        range(len(trial_rows)),
+        key=lambda index: trial_rows[index]["duration_seconds"],
+    )
+
+    if only_slowest:
+        return [trial_rows[slowest_index]]
+
+    return [row for index, row in enumerate(trial_rows) if index != slowest_index]
+
+
+def load_agent_runs(
+    conversation_dir: Path,
+    *,
+    exclude_slowest: bool = False,
+    only_slowest: bool = False,
+) -> dict[str, dict[str, list[float]]]:
     """Load speed metrics from the latest batch of each agent config.
 
     Returns a dict mapping agent_id to a dict of metric_name -> list of trial values.
@@ -61,8 +86,7 @@ def load_agent_runs(conversation_dir: Path) -> dict[str, dict[str, list[float]]]
 
         agent_id = batch_data.get("agent_id", agent_dir.name)
 
-        # Collect per-trial metrics
-        trial_metrics: dict[str, list[float]] = {m: [] for m in metric_paths}
+        trial_rows: list[dict[str, float]] = []
 
         for trial_dir in trial_dirs:
             run_json = trial_dir / "run.json"
@@ -72,6 +96,7 @@ def load_agent_runs(conversation_dir: Path) -> dict[str, dict[str, list[float]]]
             with open(run_json) as f:
                 run_data = json.load(f)
 
+            row: dict[str, float] = {}
             for metric_name, path in metric_paths.items():
                 value = run_data
                 for key in path:
@@ -81,7 +106,24 @@ def load_agent_runs(conversation_dir: Path) -> dict[str, dict[str, list[float]]]
                         value = None
                         break
                 if value is not None and isinstance(value, (int, float)):
-                    trial_metrics[metric_name].append(float(value))
+                    row[metric_name] = float(value)
+
+            if row.get("duration_seconds") is not None:
+                trial_rows.append(row)
+
+        filtered_rows = _filter_trial_rows(
+            trial_rows=trial_rows,
+            exclude_slowest=exclude_slowest,
+            only_slowest=only_slowest,
+        )
+
+        # Collect per-trial metrics
+        trial_metrics: dict[str, list[float]] = {m: [] for m in metric_paths}
+        for row in filtered_rows:
+            for metric_name in metric_paths:
+                value = row.get(metric_name)
+                if value is not None:
+                    trial_metrics[metric_name].append(value)
 
         # Skip agents with no valid trial data
         if not any(trial_metrics[m] for m in trial_metrics):

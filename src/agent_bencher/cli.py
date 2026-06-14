@@ -110,6 +110,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Path to a conversation directory under runs/ (e.g., runs/sample-conversation).",
     )
+    viz_filter_group = viz_parser.add_mutually_exclusive_group()
+    viz_filter_group.add_argument(
+        "--exclude-slowest",
+        action="store_true",
+        help="Exclude the slowest trial from each agent's latest batch before plotting.",
+    )
+    viz_filter_group.add_argument(
+        "--only-slowest",
+        action="store_true",
+        help="Plot only the slowest trial from each agent's latest batch.",
+    )
     viz_parser.set_defaults(func=viz)
 
     bench.set_defaults(func=bench_cmd)
@@ -206,7 +217,11 @@ def viz(args: argparse.Namespace) -> int:
     if not conversation_dir.is_absolute():
         conversation_dir = Path.cwd() / conversation_dir
 
-    agents = load_agent_runs(conversation_dir)
+    agents = load_agent_runs(
+        conversation_dir,
+        exclude_slowest=args.exclude_slowest,
+        only_slowest=args.only_slowest,
+    )
 
     viz_dir = conversation_dir / "viz"
     viz_dir.mkdir(exist_ok=True)
