@@ -360,3 +360,64 @@ def test_run_conversation_records_failed_turn_when_adapter_reports_fatal_turn_er
     assert "prompt: Do this" in result.turns[0].fatal_error
     assert "error: UnknownError: boom" in result.turns[0].fatal_error
     assert 'stdout: {"session_id":"session-123"}' in result.turns[0].fatal_error
+
+
+def test_run_conversation_emits_incremental_checkpoints(tmp_path: Path) -> None:
+    conversation = Conversation(
+        name="sample",
+        source_workspace=tmp_path,
+        prompts=[
+            Prompt(text="Do this"),
+            Prompt(text="Explain that"),
+        ],
+    )
+    agent = AgentConfig(
+        id="open-fast",
+        frontend="opencode",
+        model="mtplx/mtplx-qwen36-27b-optimized-speed",
+    )
+    adapter = FakeAdapter()
+    checkpoints: list[SessionResult] = []
+
+    calls = iter(
+        [
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=1.5,
+                started_at="2026-05-31T14:26:00Z",
+                ended_at="2026-05-31T14:26:01.500000Z",
+            ),
+            FakeCompletedRun(
+                stdout='{"session_id":"session-123"}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=2.0,
+                started_at="2026-05-31T14:26:01.500000Z",
+                ended_at="2026-05-31T14:26:03.500000Z",
+            ),
+        ]
+    )
+
+    result = run_conversation(
+        conversation=conversation,
+        agent=agent,
+        workspace=tmp_path,
+        adapter=adapter,
+        run_command=lambda _command: next(calls),
+        run_id="2026-05-31T14-26-00",
+        started_at="2026-05-31T14:26:00Z",
+        on_turn_completed=checkpoints.append,
+    )
+
+    assert result.status == "completed"
+    assert len(checkpoints) == 2
+    assert checkpoints[0].status == "partial"
+    assert checkpoints[0].prompts_attempted == 1
+    assert checkpoints[0].prompts_completed == 1
+    assert len(checkpoints[0].turns) == 1
+    assert checkpoints[1].status == "completed"
+    assert checkpoints[1].prompts_attempted == 2
+    assert checkpoints[1].prompts_completed == 2
+    assert len(checkpoints[1].turns) == 2

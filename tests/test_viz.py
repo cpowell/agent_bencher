@@ -3,7 +3,12 @@ import json
 
 import pytest
 
-from agent_bencher.viz import load_agent_runs, generate_bar_chart
+from agent_bencher.viz import (
+    _build_agent_styles,
+    _compute_positions,
+    generate_bar_chart,
+    load_agent_runs,
+)
 
 
 def _write_run_json(dir_path: Path, duration: float, output_tps: float, total_tps: float) -> None:
@@ -109,6 +114,40 @@ class TestLoadAgentRuns:
 
 
 class TestGenerateBarChart:
+    def test_build_agent_styles_groups_existing_agent_ids(self) -> None:
+        styles = _build_agent_styles(
+            [
+                "opencode-omlx-qwen36-27b-4bit",
+                "opencode-lmstudio-qwen36-27b-q5_k_xl-mtp",
+                "claude-qwen36-35b-a3b",
+            ]
+        )
+
+        assert styles[0].group_label == "Qwen 3.6 27B"
+        assert styles[0].short_label == "omlx: qwen36-27b-4bit"
+        assert styles[0].color_label == "OpenCode / oMLX"
+        assert styles[1].group_label == "Qwen 3.6 27B"
+        assert styles[1].short_label == "lmstudio: qwen36-27b-q5_k_xl-mtp"
+        assert styles[1].color_label == "OpenCode / LM Studio"
+        assert styles[2].group_label == "Qwen 3.6 35B A3B"
+        assert styles[2].short_label == "claude: qwen36-35b-a3b"
+        assert styles[2].color_label == "Claude"
+
+    def test_compute_positions_adds_gaps_between_groups(self) -> None:
+        styles = _build_agent_styles(
+            [
+                "opencode-omlx-qwen36-27b-4bit",
+                "opencode-lmstudio-qwen36-27b-q5_k_xl-mtp",
+                "opencode-omlx-qwen36-35b-a3b-6bit",
+                "claude-qwen36-35b-a3b",
+            ]
+        )
+
+        positions, separators = _compute_positions(styles, group_gap=1.0)
+
+        assert positions == [0.0, 1.0, 3.0, 4.0]
+        assert separators == [2.0]
+
     def test_generates_png_file(self, tmp_path: Path) -> None:
         agents = {
             "agent-a": {"duration_seconds": [100.0, 120.0], "effective_output_tps": [20.0, 25.0],
@@ -136,12 +175,12 @@ class TestGenerateBarChart:
 
     def test_chart_has_correct_number_of_bars(self, tmp_path: Path) -> None:
         agents = {
-            "agent-a": {"duration_seconds": [100.0, 120.0], "effective_output_tps": [20.0, 25.0],
-                        "effective_total_throughput_tps": [1000.0, 1100.0]},
-            "agent-b": {"duration_seconds": [80.0, 90.0], "effective_output_tps": [30.0, 28.0],
-                        "effective_total_throughput_tps": [1500.0, 1400.0]},
-            "agent-c": {"duration_seconds": [150.0, 160.0], "effective_output_tps": [10.0, 12.0],
-                        "effective_total_throughput_tps": [600.0, 650.0]},
+            "opencode-omlx-agent-a": {"duration_seconds": [100.0, 120.0], "effective_output_tps": [20.0, 25.0],
+                                      "effective_total_throughput_tps": [1000.0, 1100.0]},
+            "opencode-lmstudio-agent-b": {"duration_seconds": [80.0, 90.0], "effective_output_tps": [30.0, 28.0],
+                                          "effective_total_throughput_tps": [1500.0, 1400.0]},
+            "claude-agent-c": {"duration_seconds": [150.0, 160.0], "effective_output_tps": [10.0, 12.0],
+                               "effective_total_throughput_tps": [600.0, 650.0]},
         }
         output = tmp_path / "three_agents.png"
 

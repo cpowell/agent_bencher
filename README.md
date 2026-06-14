@@ -178,7 +178,7 @@ For each trial, the harness:
 2. Starts the first turn with the selected frontend adapter.
 3. Continues later turns using the session ID returned by that frontend.
 4. Captures stdout, stderr, exit code, timestamps, and token usage per turn.
-5. Writes trial artifacts immediately so partial results survive failures or interrupts.
+5. Checkpoints completed turns into the trial workspace's `artifacts/` directory as the run progresses, then writes the finalized copy into the batch directory.
 
 Successful trial workspaces are deleted after completion. Failed or partial trial workspaces are left on disk for inspection.
 
@@ -243,6 +243,8 @@ Key artifacts:
 - `trials/trial-###/conversation.md`: human-readable prompt/response transcript with timestamps
 - `trials/trial-###/transcripts/*`: raw stdout/stderr captured for each turn
 
+During an in-flight trial, the copied workspace root also contains a sibling `artifacts/` directory. That directory is updated after each completed turn so you can inspect partial progress even if a later prompt hangs or you interrupt the run.
+
 ### Metrics
 
 The harness records:
@@ -277,6 +279,6 @@ These are the actual command shapes the harness uses:
 
 ## Notes
 
-- The harness writes partial artifacts during multi-run batches, so interrupted runs still leave usable data behind.
+- The harness checkpoints completed turns during a run into the per-trial workspace `artifacts/` directory, and also writes accumulated batch results after each finished trial.
 - `viz` ignores the `viz/` directory itself and compares the latest batch found for each agent config.
 - Progress is shown on stderr when the process is attached to a TTY.

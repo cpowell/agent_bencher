@@ -1,6 +1,6 @@
-id: opencode-omlx-qwen36-27b-4bit
+id: opencode-omlx-qwen36-27b-6bit
 frontend: opencode
-model: omlx/Qwen3.6-27B-4bit
+model: omlx/Qwen3.6-27B-MLX-6bit
 args:
   - --format
   - json

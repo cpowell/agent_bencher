@@ -9,7 +9,7 @@ import sys
 from agent_bencher.adapters import get_adapter
 from agent_bencher.batch import build_batch_result
 from agent_bencher.process import run_command
-from agent_bencher.results import write_batch_results
+from agent_bencher.results import write_batch_results, write_trial_results
 from agent_bencher.runner import run_conversation
 from agent_bencher.suite import load_agent_config, load_conversation
 from agent_bencher.viz import generate_bar_chart, load_agent_runs
@@ -133,6 +133,10 @@ def bench_cmd(args: argparse.Namespace) -> int:
                 run_id=trial_run_id,
                 started_at=trial_started_at.isoformat(),
                 comment=args.comment,
+                on_turn_completed=lambda checkpoint_session: write_trial_results(
+                    session=checkpoint_session,
+                    output_dir=prepared.artifacts_dir,
+                ),
             )
             sessions.append(session)
             _write_available_batch_results(

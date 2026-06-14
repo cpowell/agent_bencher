@@ -80,6 +80,39 @@ def _format_progress_description(*, index: int, total: int, prompt_text: str) ->
     return f"prompt {index + 1}/{total}: {_excerpt(prompt_text, limit=80)}"
 
 
+def _build_session_result(
+    *,
+    conversation: Conversation,
+    agent: AgentConfig,
+    turns: list[TurnResult],
+    run_id: str,
+    started_at: str,
+    comment: str,
+    session_id: str,
+    execution_duration: float,
+) -> SessionResult:
+    status = "completed" if len(turns) == len(conversation.prompts) and all(turn.exit_code == 0 for turn in turns) else "partial"
+    if turns and turns[-1].exit_code != 0:
+        status = "failed"
+
+    return SessionResult(
+        run_id=run_id,
+        conversation_name=conversation.name,
+        agent_id=agent.id,
+        frontend=agent.frontend,
+        backend_model=agent.model,
+        comment=comment,
+        session_id=session_id,
+        started_at=started_at,
+        ended_at=turns[-1].ended_at if turns else started_at,
+        duration_seconds=execution_duration,
+        status=status,
+        prompts_attempted=len(turns),
+        prompts_completed=sum(1 for turn in turns if turn.exit_code == 0),
+        turns=list(turns),
+    )
+
+
 def run_conversation(
     *,
     conversation: Conversation,
@@ -91,6 +124,7 @@ def run_conversation(
     started_at: str,
     comment: str = "",
     progress_factory: Callable[..., ProgressBar] = _default_progress_factory,
+    on_turn_completed: Callable[[SessionResult], None] | None = None,
 ):
     turns: list[TurnResult] = []
     session_id = ""
@@ -155,6 +189,19 @@ def run_conversation(
                     fatal_error=fatal_error or "",
                 )
             )
+            if on_turn_completed is not None:
+                on_turn_completed(
+                    _build_session_result(
+                        conversation=conversation,
+                        agent=agent,
+                        turns=turns,
+                        run_id=run_id,
+                        started_at=started_at,
+                        comment=comment,
+                        session_id=session_id,
+                        execution_duration=execution_duration,
+                    )
+                )
             progress.update(1)
 
             if fatal_error or turn_exit_code != 0:
@@ -162,23 +209,13 @@ def run_conversation(
     finally:
         progress.close()
 
-    status = "completed" if len(turns) == len(conversation.prompts) and all(turn.exit_code == 0 for turn in turns) else "partial"
-    if turns and turns[-1].exit_code != 0:
-        status = "failed"
-
-    return SessionResult(
+    return _build_session_result(
+        conversation=conversation,
+        agent=agent,
+        turns=turns,
         run_id=run_id,
-        conversation_name=conversation.name,
-        agent_id=agent.id,
-        frontend=agent.frontend,
-        backend_model=agent.model,
+        started_at=started_at,
         comment=comment,
         session_id=session_id,
-        started_at=started_at,
-        ended_at=turns[-1].ended_at if turns else started_at,
-        duration_seconds=execution_duration,
-        status=status,
-        prompts_attempted=len(turns),
-        prompts_completed=sum(1 for turn in turns if turn.exit_code == 0),
-        turns=turns,
+        execution_duration=execution_duration,
     )
