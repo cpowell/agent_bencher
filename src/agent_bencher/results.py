@@ -66,6 +66,7 @@ def _serialize_turn(turn: TurnResult, *, run_id: str, turn_index: int) -> dict:
         "stdout_path": turn.stdout_path,
         "stderr_path": turn.stderr_path,
         "warnings": list(turn.warnings),
+        "fatal_error": turn.fatal_error,
     }
 
 

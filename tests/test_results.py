@@ -74,8 +74,46 @@ def test_write_results_emits_compact_run_json_and_turns_jsonl(tmp_path: Path) ->
     assert len(turn_payloads) == 2
     assert turn_payloads[0]["output_tps"] == 33.333333333333336
     assert turn_payloads[0]["total_throughput_tps"] == 116.66666666666667
+    assert turn_payloads[0]["fatal_error"] == ""
     assert turn_payloads[1]["output_tps"] == 34.78260869565218
     assert turn_payloads[1]["total_throughput_tps"] == 126.08695652173914
+
+
+def test_write_results_serializes_turn_fatal_error(tmp_path: Path) -> None:
+    session = SessionResult(
+        run_id="2026-05-31T14-26-00",
+        conversation_name="sample-conversation",
+        agent_id="open-fast",
+        frontend="opencode",
+        backend_model="sample-model",
+        session_id="opencode-session-123",
+        started_at="2026-05-31T14:26:00Z",
+        ended_at="2026-05-31T14:26:03Z",
+        duration_seconds=3.5,
+        status="failed",
+        comment="",
+        prompts_attempted=1,
+        prompts_completed=0,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id="opencode-session-123",
+                exit_code=1,
+                duration_seconds=1.2,
+                stdout="assistant output",
+                stderr="permission denied",
+                token_usage=TokenUsage(input=100, output=40),
+                fatal_error="turn 1 failed\nerror: UnknownError: boom",
+            ),
+        ],
+    )
+
+    write_results(sessions=[session], output_dir=tmp_path)
+
+    turn_payload = json.loads((tmp_path / "turns.jsonl").read_text().strip())
+
+    assert turn_payload["fatal_error"] == "turn 1 failed\nerror: UnknownError: boom"
 
 
 def test_write_results_emits_human_readable_conversation_markdown(tmp_path: Path) -> None:

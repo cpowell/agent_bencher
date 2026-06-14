@@ -124,18 +124,19 @@ def run_conversation(
             completed = run_command(command)
             parsed = adapter.parse_turn_output(stdout=completed.stdout, stderr=completed.stderr)
             fatal_error = parsed.get("fatal_error")
+            parsed_session_id = parsed["session_id"]
+            turn_exit_code = completed.exit_code
             if fatal_error:
-                raise RuntimeError(
-                    _build_turn_failure_message(
-                        turn_index=index + 1,
-                        prompt_text=prompt.text,
-                        agent=agent,
-                        fatal_error=fatal_error,
-                        stdout=completed.stdout,
-                        stderr=completed.stderr,
-                    )
+                turn_exit_code = completed.exit_code or 1
+                fatal_error = _build_turn_failure_message(
+                    turn_index=index + 1,
+                    prompt_text=prompt.text,
+                    agent=agent,
+                    fatal_error=fatal_error,
+                    stdout=completed.stdout,
+                    stderr=completed.stderr,
                 )
-            session_id = parsed["session_id"]
+            session_id = parsed_session_id
             execution_duration += completed.duration_seconds
 
             turns.append(
@@ -143,7 +144,7 @@ def run_conversation(
                     prompt_id=_format_prompt_id(index),
                     prompt_text=prompt.text,
                     session_id=session_id,
-                    exit_code=completed.exit_code,
+                    exit_code=turn_exit_code,
                     duration_seconds=completed.duration_seconds,
                     stdout=completed.stdout,
                     stderr=completed.stderr,
@@ -151,11 +152,12 @@ def run_conversation(
                     started_at=completed.started_at,
                     ended_at=completed.ended_at,
                     warnings=list(parsed["warnings"]),
+                    fatal_error=fatal_error or "",
                 )
             )
             progress.update(1)
 
-            if completed.exit_code != 0:
+            if fatal_error or turn_exit_code != 0:
                 break
     finally:
         progress.close()

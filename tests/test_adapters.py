@@ -26,9 +26,43 @@ def test_opencode_start_command_uses_real_cli_shape(tmp_path: Path) -> None:
         "run",
         "--format",
         "json",
+        "--dir",
+        str(tmp_path.resolve()),
         "-m",
         "mtplx/mtplx-qwen36-27b-optimized-speed",
         "Reply with exactly OK",
+    ]
+
+
+def test_opencode_continue_command_pins_workspace_dir(tmp_path: Path) -> None:
+    adapter = OpenCodeAdapter()
+    agent = AgentConfig(
+        id="open-fast",
+        frontend="opencode",
+        model="mtplx/mtplx-qwen36-27b-optimized-speed",
+        args=["--format", "json"],
+        env={},
+    )
+
+    command = adapter.build_continue_command(
+        prompt=Prompt(text="Continue"),
+        variant=agent,
+        workspace=tmp_path,
+        session_id="session-123",
+    )
+
+    assert command.argv == [
+        "opencode",
+        "run",
+        "--format",
+        "json",
+        "--dir",
+        str(tmp_path.resolve()),
+        "-m",
+        "mtplx/mtplx-qwen36-27b-optimized-speed",
+        "--session",
+        "session-123",
+        "Continue",
     ]
 
 

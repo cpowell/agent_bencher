@@ -313,7 +313,7 @@ def test_run_conversation_uses_agent_execution_time_not_bookkeeping(tmp_path: Pa
     assert result.duration_seconds == 3.5
 
 
-def test_run_conversation_aborts_when_adapter_reports_fatal_turn_error(tmp_path: Path) -> None:
+def test_run_conversation_records_failed_turn_when_adapter_reports_fatal_turn_error(tmp_path: Path) -> None:
     conversation = Conversation(
         name="sample",
         source_workspace=tmp_path,
@@ -340,23 +340,23 @@ def test_run_conversation_aborts_when_adapter_reports_fatal_turn_error(tmp_path:
         ]
     )
 
-    try:
-        run_conversation(
-            conversation=conversation,
-            agent=agent,
-            workspace=tmp_path,
-            adapter=adapter,
-            run_command=lambda _command: next(calls),
-            run_id="2026-05-31T14-26-00",
-            started_at="2026-05-31T14:26:00Z",
-        )
-    except RuntimeError as error:
-        message = str(error)
-        assert "turn 1 failed" in message
-        assert "frontend: opencode" in message
-        assert "model: mtplx/mtplx-qwen36-27b-optimized-speed" in message
-        assert "prompt: Do this" in message
-        assert "error: UnknownError: boom" in message
-        assert 'stdout: {"session_id":"session-123"}' in message
-    else:
-        raise AssertionError("expected fatal turn error to abort the benchmark")
+    result = run_conversation(
+        conversation=conversation,
+        agent=agent,
+        workspace=tmp_path,
+        adapter=adapter,
+        run_command=lambda _command: next(calls),
+        run_id="2026-05-31T14-26-00",
+        started_at="2026-05-31T14:26:00Z",
+    )
+
+    assert result.status == "failed"
+    assert result.prompts_attempted == 1
+    assert result.prompts_completed == 0
+    assert result.turns[0].exit_code == 1
+    assert "turn 1 failed" in result.turns[0].fatal_error
+    assert "frontend: opencode" in result.turns[0].fatal_error
+    assert "model: mtplx/mtplx-qwen36-27b-optimized-speed" in result.turns[0].fatal_error
+    assert "prompt: Do this" in result.turns[0].fatal_error
+    assert "error: UnknownError: boom" in result.turns[0].fatal_error
+    assert 'stdout: {"session_id":"session-123"}' in result.turns[0].fatal_error

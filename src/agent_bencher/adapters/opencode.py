@@ -10,7 +10,16 @@ from agent_bencher.models import AgentConfig, Prompt
 class OpenCodeAdapter:
     def build_start_command(self, *, prompt: Prompt, variant: AgentConfig, workspace: Path) -> CommandSpec:
         return CommandSpec(
-            argv=["opencode", "run", *variant.args, "-m", variant.model, prompt.text],
+            argv=[
+                "opencode",
+                "run",
+                *variant.args,
+                "--dir",
+                str(workspace.resolve()),
+                "-m",
+                variant.model,
+                prompt.text,
+            ],
             cwd=workspace,
             env=variant.env,
         )
@@ -28,6 +37,8 @@ class OpenCodeAdapter:
                 "opencode",
                 "run",
                 *variant.args,
+                "--dir",
+                str(workspace.resolve()),
                 "-m",
                 variant.model,
                 "--session",
