@@ -362,6 +362,52 @@ def test_run_conversation_records_failed_turn_when_adapter_reports_fatal_turn_er
     assert 'stdout: {"session_id":"session-123"}' in result.turns[0].fatal_error
 
 
+def test_run_conversation_omits_stdout_excerpt_for_concise_provider_errors(tmp_path: Path) -> None:
+    conversation = Conversation(
+        name="sample",
+        source_workspace=tmp_path,
+        prompts=[Prompt(text="Do this")],
+    )
+    agent = AgentConfig(
+        id="open-fast",
+        frontend="opencode",
+        model="omlx/Qwen3.6-35B-A3B-oQ6-fp16-mtp",
+    )
+    adapter = FakeAdapter()
+    adapter.fatal_error = (
+        "OpenCodeProviderError: omlx model 'Qwen3.6-35B-A3B-oQ6-fp16-mtp' not found; "
+        "suggestions: Qwen3.6-35B-A3B-6bit, Qwen3.6-27B-MLX-6bit"
+    )
+
+    calls = iter(
+        [
+            FakeCompletedRun(
+                stdout='[07:04:45.326] ERROR (#10949): failed {"noise":true}',
+                stderr="",
+                exit_code=0,
+                duration_seconds=1.5,
+                started_at="2026-05-31T14:26:00Z",
+                ended_at="2026-05-31T14:26:01.500000Z",
+            ),
+        ]
+    )
+
+    result = run_conversation(
+        conversation=conversation,
+        agent=agent,
+        workspace=tmp_path,
+        adapter=adapter,
+        run_command=lambda _command: next(calls),
+        run_id="2026-05-31T14-26-00",
+        started_at="2026-05-31T14:26:00Z",
+    )
+
+    assert result.status == "failed"
+    assert "error: OpenCodeProviderError:" in result.turns[0].fatal_error
+    assert "stdout:" not in result.turns[0].fatal_error
+    assert "stderr:" not in result.turns[0].fatal_error
+
+
 def test_run_conversation_emits_incremental_checkpoints(tmp_path: Path) -> None:
     conversation = Conversation(
         name="sample",

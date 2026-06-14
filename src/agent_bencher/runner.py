@@ -45,6 +45,13 @@ def _excerpt(value: str, *, limit: int = 400) -> str:
     return text[: limit - 3] + "..."
 
 
+def _should_include_output_excerpts(*, fatal_error: str) -> bool:
+    concise_prefixes = (
+        "OpenCodeProviderError:",
+    )
+    return not fatal_error.startswith(concise_prefixes)
+
+
 def _build_turn_failure_message(
     *,
     turn_index: int,
@@ -61,6 +68,9 @@ def _build_turn_failure_message(
         f"prompt: {prompt_text}",
         f"error: {fatal_error}",
     ]
+
+    if not _should_include_output_excerpts(fatal_error=fatal_error):
+        return "\n".join(lines)
 
     stdout_excerpt = _excerpt(stdout)
     stderr_excerpt = _excerpt(stderr)

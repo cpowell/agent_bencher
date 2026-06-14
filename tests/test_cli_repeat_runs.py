@@ -36,6 +36,39 @@ def _make_session(*, run_id: str) -> SessionResult:
     )
 
 
+def _make_failed_session(*, run_id: str, stdout_path: str = "", stderr_path: str = "") -> SessionResult:
+    return SessionResult(
+        run_id=run_id,
+        conversation_name="sample-conversation",
+        agent_id="open-fast",
+        frontend="opencode",
+        backend_model="model-x",
+        session_id=f"session-{run_id}",
+        started_at="2026-06-01T00:00:00Z",
+        ended_at="2026-06-01T00:00:01Z",
+        duration_seconds=1.0,
+        status="failed",
+        prompts_attempted=1,
+        prompts_completed=0,
+        turns=[
+            TurnResult(
+                prompt_id="01",
+                prompt_text="Do this",
+                session_id=f"session-{run_id}",
+                exit_code=1,
+                duration_seconds=1.0,
+                stdout="plain text output",
+                stderr="",
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+                token_usage=TokenUsage(input=0, output=0),
+                fatal_error="turn 1 failed\nerror: OpenCodeOutputParseError: offending line: 'plain text output'",
+            )
+        ],
+        comment="",
+    )
+
+
 def test_build_parser_defaults_runs_to_one() -> None:
     parser = build_parser()
     parsed = parser.parse_args(["bench", "run_configs/opencode.yaml", "conversations/sample.yaml"])
@@ -273,11 +306,7 @@ def test_main_keeps_failed_trial_workspaces(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr("agent_bencher.cli.write_batch_results", lambda **kwargs: None)
 
     def failed_session(**kwargs):
-        session = _make_session(run_id="run-1")
-        session.status = "failed"
-        session.prompts_completed = 0
-        session.turns[0].exit_code = 1
-        return session
+        return _make_failed_session(run_id="run-1")
 
     monkeypatch.setattr("agent_bencher.cli.run_conversation", failed_session)
 
@@ -291,9 +320,69 @@ def test_main_keeps_failed_trial_workspaces(monkeypatch, tmp_path: Path) -> None
         ]
     )
 
-    assert exit_code == 0
+    assert exit_code == 1
     assert workspace_roots
     assert workspace_roots[0].exists()
+
+
+def test_main_prints_failed_trial_summary(monkeypatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_conversation",
+        lambda _path: Conversation(
+            name="sample-conversation",
+            source_workspace=tmp_path / "source",
+            prompts=[Prompt(text="Do this")],
+        ),
+    )
+    monkeypatch.setattr(
+        "agent_bencher.cli.load_agent_config",
+        lambda _path: AgentConfig(id="open-fast", frontend="opencode", model="model-x"),
+    )
+
+    class PreparedWorkspace:
+        def __init__(self, path: Path, artifacts_dir: Path) -> None:
+            self.variant_workspace = path
+            self.artifacts_dir = artifacts_dir
+
+    def fake_prepare_variant_workspace(*, source_workspace: Path, run_root: Path, suite_name: str, variant_id: str):
+        root = tmp_path / "hex-1"
+        workspace = root / "workspace"
+        artifacts = root / "artifacts"
+        workspace.mkdir(parents=True, exist_ok=True)
+        artifacts.mkdir(parents=True, exist_ok=True)
+        return PreparedWorkspace(workspace, artifacts)
+
+    monkeypatch.setattr("agent_bencher.cli.prepare_variant_workspace", fake_prepare_variant_workspace)
+    monkeypatch.setattr("agent_bencher.cli.get_adapter", lambda _frontend: object())
+    monkeypatch.setattr("agent_bencher.cli.run_command", lambda _command: None)
+    monkeypatch.setattr("agent_bencher.cli.write_batch_results", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "agent_bencher.cli.run_conversation",
+        lambda **kwargs: _make_failed_session(
+            run_id="run-1",
+            stdout_path=str(tmp_path / "hex-1" / "artifacts" / "transcripts" / "01-01.stdout.txt"),
+            stderr_path=str(tmp_path / "hex-1" / "artifacts" / "transcripts" / "01-01.stderr.txt"),
+        ),
+    )
+
+    exit_code = main(
+        [
+            "bench",
+            "run_configs/opencode.yaml",
+            "conversations/sample.yaml",
+            "--output-dir",
+            str(tmp_path / "runs"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Trial 1/1 failed after 0/1 completed prompts" in captured.err
+    assert "OpenCodeOutputParseError" in captured.err
+    assert "stdout transcript:" in captured.err
+    assert "stderr transcript:" in captured.err
+    assert "trial artifacts:" in captured.err
 
 
 def test_main_prints_run_start_and_end_timestamps(monkeypatch, tmp_path: Path, capsys) -> None:

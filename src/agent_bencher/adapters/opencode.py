@@ -2,9 +2,46 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 
 from agent_bencher.adapters.base import CommandSpec
 from agent_bencher.models import AgentConfig, Prompt
+
+
+def _extract_text_field(stdout: str, field_name: str) -> str:
+    match = re.search(rf'{re.escape(field_name)}:\s*"([^"]+)"', stdout)
+    return match.group(1) if match else ""
+
+
+def _extract_suggestions(stdout: str) -> list[str]:
+    match = re.search(r"suggestions:\s*\[(.*?)\]", stdout, re.DOTALL)
+    if not match:
+        return []
+    return re.findall(r'"([^"]+)"', match.group(1))
+
+
+def _extract_provider_model_not_found_error(stdout: str) -> str | None:
+    if "ProviderModelNotFoundError" not in stdout:
+        return None
+
+    provider_id = _extract_text_field(stdout, "providerID")
+    model_id = _extract_text_field(stdout, "modelID")
+    suggestions = _extract_suggestions(stdout)
+
+    if not provider_id and not model_id:
+        return "OpenCodeProviderError: provider model not found"
+
+    parts = [
+        "OpenCodeProviderError:",
+        provider_id or "unknown provider",
+        "model",
+        f"{model_id!r}" if model_id else "'unknown'",
+        "not found",
+    ]
+    message = " ".join(parts)
+    if suggestions:
+        message += f"; suggestions: {', '.join(suggestions)}"
+    return message
 
 
 class OpenCodeAdapter:
@@ -53,11 +90,20 @@ class OpenCodeAdapter:
         session_id = ""
         token_usage = {"input": 0, "output": 0, "reasoning": 0, "cache_read": 0, "cache_write": 0}
         fatal_error = None
+        warnings = []
 
         for line in stdout.splitlines():
             if not line.strip():
                 continue
-            payload = json.loads(line)
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as error:
+                warnings.append("malformed-opencode-jsonl")
+                fatal_error = _extract_provider_model_not_found_error(stdout) or (
+                    f"OpenCodeOutputParseError: {error.msg} "
+                    f"at column {error.colno}; offending line: {line!r}"
+                )
+                break
             session_id = payload.get("sessionID", payload.get("session_id", session_id))
             if payload.get("type") == "error":
                 error = payload.get("error", {})
@@ -83,6 +129,6 @@ class OpenCodeAdapter:
         return {
             "session_id": session_id,
             "token_usage": token_usage,
-            "warnings": [],
+            "warnings": warnings,
             "fatal_error": fatal_error,
         }

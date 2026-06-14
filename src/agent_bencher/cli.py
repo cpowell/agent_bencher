@@ -51,6 +51,23 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def _print_failed_session_summary(*, session, trial_index: int, requested_runs: int, artifacts_dir: Path) -> None:
+    print(
+        f"Trial {trial_index}/{requested_runs} failed after "
+        f"{session.prompts_completed}/{session.prompts_attempted} completed prompts",
+        file=sys.stderr,
+        flush=True,
+    )
+    if session.turns:
+        failed_turn = session.turns[-1]
+        print(failed_turn.fatal_error or "No fatal error details recorded.", file=sys.stderr, flush=True)
+        if failed_turn.stdout_path:
+            print(f"stdout transcript: {failed_turn.stdout_path}", file=sys.stderr, flush=True)
+        if failed_turn.stderr_path:
+            print(f"stderr transcript: {failed_turn.stderr_path}", file=sys.stderr, flush=True)
+    print(f"trial artifacts: {artifacts_dir}", file=sys.stderr, flush=True)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m agent_bencher",
@@ -148,6 +165,13 @@ def bench_cmd(args: argparse.Namespace) -> int:
             )
             if session.status == "completed":
                 shutil.rmtree(prepared.variant_workspace.parent)
+            else:
+                _print_failed_session_summary(
+                    session=session,
+                    trial_index=trial_index + 1,
+                    requested_runs=args.runs,
+                    artifacts_dir=prepared.artifacts_dir,
+                )
     except KeyboardInterrupt:
         interrupted = True
         print("Terminating early at user request", file=sys.stderr, flush=True)
@@ -166,7 +190,7 @@ def bench_cmd(args: argparse.Namespace) -> int:
             sessions=sessions,
             output_dir=batch_output_dir,
         )
-        return 0
+        return 0 if all(session.status == "completed" for session in sessions) else 1
     finally:
         print(
             f"Run concluded at {format_display_time(datetime.now(timezone.utc))}",

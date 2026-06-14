@@ -181,3 +181,55 @@ def test_opencode_parser_surfaces_error_events_as_fatal() -> None:
 
     assert parsed["session_id"] == "opencode-session-123"
     assert parsed["fatal_error"] == "UnknownError: boom"
+
+
+def test_opencode_parser_surfaces_malformed_json_line_with_exact_output() -> None:
+    payload = """
+{"type":"step_start","sessionID":"opencode-session-123","part":{"type":"step-start"}}
+Hi there
+"""
+
+    parsed = OpenCodeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == "opencode-session-123"
+    assert parsed["warnings"] == ["malformed-opencode-jsonl"]
+    assert parsed["fatal_error"] == (
+        "OpenCodeOutputParseError: Expecting value at column 1; offending line: 'Hi there'"
+    )
+
+
+def test_opencode_parser_reports_exact_malformed_json_syntax() -> None:
+    payload = "{'broken': true}"
+
+    parsed = OpenCodeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == ""
+    assert parsed["warnings"] == ["malformed-opencode-jsonl"]
+    assert parsed["fatal_error"] == (
+        'OpenCodeOutputParseError: Expecting property name enclosed in double quotes '
+        'at column 2; offending line: "{\'broken\': true}"'
+    )
+
+
+def test_opencode_parser_rewrites_provider_model_not_found_into_corrective_error() -> None:
+    payload = """
+[07:03:02.484] ERROR (#10949): failed {
+  ref: "err_2d043162",
+  error: {
+    providerID: "omlx",
+    modelID: "Qwen3.6-35B-A3B-oQ6-fp16-mtp",
+    suggestions: [ "Qwen3.6-35B-A3B-6bit", "Qwen3.6-27B-MLX-6bit" ],
+    _tag: "ProviderModelNotFoundError",
+  },
+  cause: "ProviderModelNotFoundError: ...",
+}
+"""
+
+    parsed = OpenCodeAdapter().parse_turn_output(stdout=payload, stderr="")
+
+    assert parsed["session_id"] == ""
+    assert parsed["warnings"] == ["malformed-opencode-jsonl"]
+    assert parsed["fatal_error"] == (
+        "OpenCodeProviderError: omlx model 'Qwen3.6-35B-A3B-oQ6-fp16-mtp' not found; "
+        "suggestions: Qwen3.6-35B-A3B-6bit, Qwen3.6-27B-MLX-6bit"
+    )
