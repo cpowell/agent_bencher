@@ -1,0 +1,7 @@
+id: opencode-omlx-qwen36-27b-6bit-dflash
+frontend: opencode
+model: omlx/Qwen3.6-27B-MLX-6bit
+args:
+  - --format
+  - json
+env: {}
